@@ -1,0 +1,63 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper function to check authentication
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Helper function to check if resource belongs to authenticated user
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Profiles
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow write: if isOwner(userId);
+    }
+
+    // Preferences
+    match /user_preferences/{userId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    // Virtual Accounts (read by owner, write strictly via trusted backend Admin SDK)
+    match /virtual_accounts/{accountId} {
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow write: if false; // Only backend service executes trades & balance updates
+    }
+
+    // Virtual Account Ledger (read by owner, write strictly via backend Admin SDK)
+    match /virtual_account_ledger/{ledgerId} {
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow write: if false; // Append-only by backend
+    }
+
+    // Orders & Positions (read by owner, mutated strictly by backend)
+    match /orders/{orderId} {
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow write: if false;
+    }
+
+    match /positions/{posId} {
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow write: if false;
+    }
+
+    // Watchlists & Alerts (owned by user)
+    match /watchlists/{wlId} {
+      allow read, write: if isAuthenticated() && (resource == null || resource.data.userId == request.auth.uid);
+    }
+
+    match /price_alerts/{alertId} {
+      allow read, write: if isAuthenticated() && (resource == null || resource.data.userId == request.auth.uid);
+    }
+
+    // Backtest Results
+    match /backtest_runs/{runId} {
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow write: if false; // Produced by backend backtest worker
+    }
+  }
+}
