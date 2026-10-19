@@ -44,37 +44,37 @@ export const TradingViewChart: React.FC<TradingViewChartProps> = ({
     const chart = createChart(chartContainerRef.current, {
       height,
       layout: {
-        background: { color: '#0A121E' },
-        textColor: '#94A3B8'
+        background: { color: '#070A0F' },
+        textColor: '#627284'
       },
       grid: {
-        vertLines: { color: 'rgba(30, 41, 59, 0.5)' },
-        horzLines: { color: 'rgba(30, 41, 59, 0.5)' }
+        vertLines: { color: 'rgba(27, 34, 45, 0.4)' },
+        horzLines: { color: 'rgba(27, 34, 45, 0.4)' }
       },
       crosshair: {
-        vertLine: { color: '#38BDF8', width: 1, style: 3 },
-        horzLine: { color: '#38BDF8', width: 1, style: 3 }
+        vertLine: { color: '#CCFF00', width: 1, style: 3 },
+        horzLine: { color: '#CCFF00', width: 1, style: 3 }
       },
       timeScale: {
-        borderColor: '#1E293B',
+        borderColor: '#1B222D',
         timeVisible: true,
         secondsVisible: false
       },
       rightPriceScale: {
-        borderColor: '#1E293B',
+        borderColor: '#1B222D',
         scaleMargins: { top: 0.1, bottom: 0.1 }
       }
     });
 
     chartInstance.current = chart;
 
-    // Candlesticks
+    // Candlesticks with neon lime bullish bars
     const series = chart.addCandlestickSeries({
-      upColor: '#10B981',
-      downColor: '#EF4444',
+      upColor: '#CCFF00',
+      downColor: '#FF4D4D',
       borderVisible: false,
-      wickUpColor: '#10B981',
-      wickDownColor: '#EF4444'
+      wickUpColor: '#CCFF00',
+      wickDownColor: '#FF4D4D'
     });
     candleSeries.current = series;
 
@@ -228,11 +228,11 @@ export const TradingViewChart: React.FC<TradingViewChartProps> = ({
   }, [candles, showSMA, showEMA, showVWAP, showBB]);
 
   return (
-    <div className="bg-navy-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+    <div className="bg-[#0B0F14] border border-[#1B222D] rounded-3xl overflow-hidden shadow-xl">
       {/* Chart toolbar with technical indicators */}
-      <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 border-b border-slate-800 bg-slate-850/50">
+      <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 border-b border-[#1B222D] bg-[#10151C]/60">
         <div className="flex items-center gap-2">
-          <span className="font-bold text-sm text-white tracking-wide">{symbol}</span>
+          <span className="font-extrabold text-sm text-white tracking-wide">{symbol}</span>
           <span className="text-[11px] text-slate-400 font-mono">Candlestick • Multi-Indicator Suite</span>
         </div>
 

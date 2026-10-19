@@ -94,27 +94,27 @@ export const Navbar: React.FC = () => {
   };
 
   return (
-    <header className="sticky top-0 z-40 bg-navy-900/90 backdrop-blur-md border-b border-slate-800 h-16 flex items-center justify-between px-4 lg:px-6">
+    <header className="sticky top-0 z-40 bg-[#0B0F14]/90 backdrop-blur-md border-b border-[#1B222D] h-16 flex items-center justify-between px-4 lg:px-8">
       {/* Brand & Market Status */}
       <div className="flex items-center gap-6">
         <Link to="/" className="flex items-center gap-2.5 group">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-fintech-green to-emerald-400 flex items-center justify-center text-navy-950 font-bold shadow-lg shadow-emerald-500/20 group-hover:scale-105 transition-transform">
-            <TrendingUp className="w-5 h-5 text-navy-950 stroke-[2.5]" />
+          <div className="w-9 h-9 rounded-2xl bg-[#CCFF00] flex items-center justify-center text-black font-extrabold shadow-lg shadow-[#CCFF00]/15 group-hover:scale-105 transition-transform">
+            <TrendingUp className="w-5 h-5 text-black stroke-[3]" />
           </div>
           <div>
-            <span className="font-bold text-lg tracking-tight bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">
+            <span className="font-extrabold text-lg tracking-tight text-white flex items-center gap-1.5">
               GlobalTrade
             </span>
-            <span className="text-[10px] uppercase tracking-wider block font-semibold text-emerald-400">
+            <span className="text-[10px] uppercase tracking-widest block font-bold text-[#CCFF00]">
               SIMULATOR
             </span>
           </div>
         </Link>
 
         {/* Global Market Status Badge */}
-        <div className="hidden md:flex items-center gap-2 px-2.5 py-1 rounded-full bg-slate-850/80 border border-slate-750 text-xs text-slate-300">
-          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-          <span>US & Global Feeds Live</span>
+        <div className="hidden md:flex items-center gap-2 px-3 py-1 rounded-full bg-[#10151C] border border-[#1B222D] text-xs text-slate-300">
+          <span className="w-2 h-2 rounded-full bg-[#CCFF00] animate-pulse"></span>
+          <span className="font-medium text-slate-300">US & Global Feeds Live</span>
           <span className="text-slate-500 text-[10px]">• 0-Sec Delay</span>
         </div>
       </div>
@@ -131,16 +131,16 @@ export const Navbar: React.FC = () => {
               if (searchQuery.trim().length > 0) setShowSuggestions(true);
             }}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-navy-950/80 border border-slate-800 rounded-xl pl-10 pr-4 py-2 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/50 transition-all"
+            className="w-full bg-[#10151C] border border-[#1B222D] rounded-full pl-10 pr-4 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-[#CCFF00]/60 focus:ring-1 focus:ring-[#CCFF00]/60 transition-all"
           />
         </form>
 
         {/* Live Auto-Suggestions Popover */}
         {showSuggestions && suggestions.length > 0 && (
-          <div className="absolute top-full left-0 right-0 mt-2 bg-navy-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden z-50 p-2 space-y-1">
-            <div className="px-3 py-1.5 text-[10px] uppercase font-bold text-slate-500 tracking-wider flex items-center justify-between border-b border-slate-800/80">
+          <div className="absolute top-full left-0 right-0 mt-2 bg-[#0B0F14] border border-[#1B222D] rounded-2xl shadow-2xl overflow-hidden z-50 p-2 space-y-1">
+            <div className="px-3 py-1.5 text-[10px] uppercase font-bold text-slate-500 tracking-wider flex items-center justify-between border-b border-[#1B222D]">
               <span className="flex items-center gap-1">
-                <Sparkles className="w-3 h-3 text-emerald-400" /> Matching Instruments
+                <Sparkles className="w-3 h-3 text-[#CCFF00]" /> Matching Instruments
               </span>
               <span>Press Enter to view all</span>
             </div>
@@ -149,18 +149,18 @@ export const Navbar: React.FC = () => {
               <button
                 key={item.id}
                 onClick={() => handleSelectSuggestion(item.symbol)}
-                className="w-full flex items-center justify-between p-2.5 rounded-xl hover:bg-slate-850/80 transition-colors text-left group"
+                className="w-full flex items-center justify-between p-2.5 rounded-xl hover:bg-[#10151C] transition-colors text-left group"
               >
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center font-mono text-xs font-bold text-emerald-400 border border-slate-700/60 group-hover:border-emerald-500/30">
+                  <div className="w-8 h-8 rounded-xl bg-[#10151C] flex items-center justify-center font-mono text-xs font-bold text-[#CCFF00] border border-[#1B222D] group-hover:border-[#CCFF00]/40">
                     {item.assetClass === 'CRYPTO' ? '₿' : item.assetClass === 'INDEX' ? '📊' : '$'}
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
-                      <span className="font-mono font-bold text-xs text-white group-hover:text-emerald-400 transition-colors">
+                      <span className="font-mono font-bold text-xs text-white group-hover:text-[#CCFF00] transition-colors">
                         {item.symbol}
                       </span>
-                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 font-medium">
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-[#1B222D] text-slate-400 font-medium">
                         {item.exchange}
                       </span>
                     </div>
@@ -174,7 +174,7 @@ export const Navbar: React.FC = () => {
                   <span className="text-[11px] font-mono text-slate-400">
                     {item.quoteCurrency}
                   </span>
-                  <ArrowRight className="w-3.5 h-3.5 text-slate-500 group-hover:text-emerald-400 group-hover:translate-x-0.5 transition-all" />
+                  <ArrowRight className="w-3.5 h-3.5 text-slate-500 group-hover:text-[#CCFF00] group-hover:translate-x-0.5 transition-all" />
                 </div>
               </button>
             ))}

@@ -12,7 +12,7 @@ import {
 
 export const AppShell: React.FC = () => {
   return (
-    <div className="min-h-screen flex flex-col bg-[#070D18]">
+    <div className="min-h-screen flex flex-col bg-[#050709] text-white">
       <Navbar />
       <div className="flex flex-1 overflow-hidden">
         <Sidebar />
