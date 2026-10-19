@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { formatCurrency } from '../../lib/formatters';
+import { Instrument } from '@globaltrade/shared';
+import { ApiClient } from '../../lib/apiClient';
 import { 
   TrendingUp, 
   Search, 
@@ -12,7 +14,9 @@ import {
   ShieldAlert,
   ChevronDown,
   Plus,
-  Globe
+  Globe,
+  ArrowRight,
+  Sparkles
 } from 'lucide-react';
 
 const COUNTRY_OPTIONS = [
@@ -27,18 +31,66 @@ const COUNTRY_OPTIONS = [
 export const Navbar: React.FC = () => {
   const { user, account, accounts, logout, switchAccount, createAccount } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
+  const [suggestions, setSuggestions] = useState<Instrument[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [allInstruments, setAllInstruments] = useState<Instrument[]>([]);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [accountDropdownOpen, setAccountDropdownOpen] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedCountry, setSelectedCountry] = useState(COUNTRY_OPTIONS[0]);
   const [accountName, setAccountName] = useState('');
   const navigate = useNavigate();
+  const searchContainerRef = useRef<HTMLDivElement>(null);
+
+  // Pre-load instruments for instantaneous instant auto-suggestions
+  useEffect(() => {
+    ApiClient.get<Instrument[]>('/markets/instruments')
+      .then(data => setAllInstruments(data))
+      .catch(() => {});
+  }, []);
+
+  // Filter suggestions as user types with debouncing & ranking
+  useEffect(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) {
+      setSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
+
+    const filtered = allInstruments.filter(inst => 
+      inst.symbol.toLowerCase().includes(q) || 
+      inst.name.toLowerCase().includes(q) ||
+      inst.exchange.toLowerCase().includes(q)
+    ).slice(0, 6);
+
+    setSuggestions(filtered);
+    setShowSuggestions(true);
+  }, [searchQuery, allInstruments]);
+
+  // Handle clicking outside search popover
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(e.target as Node)) {
+        setShowSuggestions(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (searchQuery.trim()) {
+      setShowSuggestions(false);
       navigate(`/markets?search=${encodeURIComponent(searchQuery.trim())}`);
     }
+  };
+
+  const handleSelectSuggestion = (symbol: string) => {
+    setShowSuggestions(false);
+    setSearchQuery('');
+    navigate(`/instrument/${encodeURIComponent(symbol)}`);
   };
 
   return (
@@ -67,19 +119,68 @@ export const Navbar: React.FC = () => {
         </div>
       </div>
 
-      {/* Global Search Bar */}
-      <form onSubmit={handleSearchSubmit} className="hidden sm:flex items-center flex-1 max-w-md mx-6">
-        <div className="relative w-full">
+      {/* Global Search Bar with Live Auto-Suggestions */}
+      <div ref={searchContainerRef} className="hidden sm:block relative flex-1 max-w-md mx-6">
+        <form onSubmit={handleSearchSubmit} className="relative w-full">
           <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
             type="text"
-            placeholder="Search stocks (AAPL, RELIANCE.NS), forex, crypto..."
+            placeholder="Search stocks (AAPL, RELIANCE), forex, crypto..."
             value={searchQuery}
+            onFocus={() => {
+              if (searchQuery.trim().length > 0) setShowSuggestions(true);
+            }}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full bg-navy-950/80 border border-slate-800 rounded-xl pl-10 pr-4 py-2 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/50 transition-all"
           />
-        </div>
-      </form>
+        </form>
+
+        {/* Live Auto-Suggestions Popover */}
+        {showSuggestions && suggestions.length > 0 && (
+          <div className="absolute top-full left-0 right-0 mt-2 bg-navy-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden z-50 p-2 space-y-1">
+            <div className="px-3 py-1.5 text-[10px] uppercase font-bold text-slate-500 tracking-wider flex items-center justify-between border-b border-slate-800/80">
+              <span className="flex items-center gap-1">
+                <Sparkles className="w-3 h-3 text-emerald-400" /> Matching Instruments
+              </span>
+              <span>Press Enter to view all</span>
+            </div>
+
+            {suggestions.map((item) => (
+              <button
+                key={item.id}
+                onClick={() => handleSelectSuggestion(item.symbol)}
+                className="w-full flex items-center justify-between p-2.5 rounded-xl hover:bg-slate-850/80 transition-colors text-left group"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center font-mono text-xs font-bold text-emerald-400 border border-slate-700/60 group-hover:border-emerald-500/30">
+                    {item.assetClass === 'CRYPTO' ? '₿' : item.assetClass === 'INDEX' ? '📊' : '$'}
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono font-bold text-xs text-white group-hover:text-emerald-400 transition-colors">
+                        {item.symbol}
+                      </span>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 font-medium">
+                        {item.exchange}
+                      </span>
+                    </div>
+                    <div className="text-[11px] text-slate-400 truncate max-w-[200px]">
+                      {item.name}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] font-mono text-slate-400">
+                    {item.quoteCurrency}
+                  </span>
+                  <ArrowRight className="w-3.5 h-3.5 text-slate-500 group-hover:text-emerald-400 group-hover:translate-x-0.5 transition-all" />
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* Virtual Account Balance & User Profile */}
       <div className="flex items-center gap-3">
