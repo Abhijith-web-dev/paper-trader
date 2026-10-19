@@ -10,14 +10,18 @@ import {
   FlaskConical, 
   GraduationCap, 
   Settings,
-  ShieldCheck
+  ShieldCheck,
+  BookOpen,
+  Building2
 } from 'lucide-react';
 
 const NAV_ITEMS = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/markets', label: 'Global Markets', icon: Globe2 },
+  { to: '/markets/coverage', label: 'Market Coverage', icon: Building2 },
   { to: '/forex', label: 'Currency Converter', icon: ArrowLeftRight },
   { to: '/portfolio', label: 'Portfolio & P&L', icon: Briefcase },
+  { to: '/journal', label: 'Trade Journal', icon: BookOpen },
   { to: '/orders', label: 'Orders & Ledger', icon: ListOrdered },
   { to: '/watchlists', label: 'Watchlists', icon: Star },
   { to: '/backtesting', label: 'Strategy Lab', icon: FlaskConical },

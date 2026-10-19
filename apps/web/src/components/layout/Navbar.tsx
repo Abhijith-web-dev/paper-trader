@@ -10,13 +10,28 @@ import {
   User, 
   LogOut, 
   ShieldAlert,
-  ChevronDown
+  ChevronDown,
+  Plus,
+  Globe
 } from 'lucide-react';
 
+const COUNTRY_OPTIONS = [
+  { code: 'US', name: 'United States', currency: 'USD', balance: 100000, label: 'US ($100k USD)' },
+  { code: 'IN', name: 'India', currency: 'INR', balance: 1000000, label: 'India (₹10,00,000 INR)' },
+  { code: 'UK', name: 'United Kingdom', currency: 'GBP', balance: 100000, label: 'UK (£100k GBP)' },
+  { code: 'EU', name: 'European Union', currency: 'EUR', balance: 100000, label: 'Europe (€100k EUR)' },
+  { code: 'JP', name: 'Japan', currency: 'JPY', balance: 10000000, label: 'Japan (¥10,000,000 JPY)' },
+  { code: 'AU', name: 'Australia', currency: 'AUD', balance: 100000, label: 'Australia (A$100k AUD)' }
+];
+
 export const Navbar: React.FC = () => {
-  const { user, account, logout } = useAuth();
+  const { user, account, accounts, logout, switchAccount, createAccount } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [accountDropdownOpen, setAccountDropdownOpen] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [selectedCountry, setSelectedCountry] = useState(COUNTRY_OPTIONS[0]);
+  const [accountName, setAccountName] = useState('');
   const navigate = useNavigate();
 
   const handleSearchSubmit = (e: React.FormEvent) => {
@@ -69,14 +84,68 @@ export const Navbar: React.FC = () => {
       {/* Virtual Account Balance & User Profile */}
       <div className="flex items-center gap-3">
         {account && (
-          <div className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-slate-850 border border-slate-750">
-            <Wallet className="w-4 h-4 text-emerald-400" />
-            <div className="text-right">
-              <span className="text-[10px] text-slate-400 block uppercase font-medium leading-none">Virtual Cash</span>
-              <span className="font-mono text-sm font-bold text-emerald-400">
-                {formatCurrency(account.availableCash, account.baseCurrency)}
-              </span>
-            </div>
+          <div className="relative">
+            <button
+              onClick={() => setAccountDropdownOpen(!accountDropdownOpen)}
+              className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-slate-850 hover:bg-slate-800 border border-slate-750 transition-colors"
+            >
+              <Wallet className="w-4 h-4 text-emerald-400" />
+              <div className="text-right">
+                <span className="text-[10px] text-slate-400 block uppercase font-medium leading-none">
+                  {account.name || `${account.baseCurrency} Account`}
+                </span>
+                <span className="font-mono text-sm font-bold text-emerald-400">
+                  {formatCurrency(account.availableCash, account.baseCurrency)}
+                </span>
+              </div>
+              <ChevronDown className="w-3.5 h-3.5 text-slate-400 ml-0.5" />
+            </button>
+
+            {accountDropdownOpen && (
+              <div className="absolute right-0 mt-2 w-72 rounded-2xl bg-navy-900 border border-slate-800 shadow-2xl p-2 z-50">
+                <div className="px-3 py-2 border-b border-slate-800 flex items-center justify-between">
+                  <span className="text-xs font-semibold text-slate-300">Virtual Accounts</span>
+                  <span className="text-[10px] uppercase font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md">
+                    Demo Mode
+                  </span>
+                </div>
+                <div className="py-1 max-h-56 overflow-y-auto space-y-1">
+                  {accounts.map((acc) => (
+                    <button
+                      key={acc.id}
+                      onClick={() => {
+                        switchAccount(acc.id);
+                        setAccountDropdownOpen(false);
+                      }}
+                      className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs transition-colors ${
+                        acc.id === account.id
+                          ? 'bg-emerald-500/15 border border-emerald-500/30 text-white font-medium'
+                          : 'hover:bg-slate-800 text-slate-300'
+                      }`}
+                    >
+                      <div className="text-left">
+                        <div className="font-semibold">{acc.name || `${acc.baseCurrency} Account`}</div>
+                        <div className="text-[10px] text-slate-400">{acc.countryCode || 'GLOBAL'} • {acc.baseCurrency}</div>
+                      </div>
+                      <div className="text-right font-mono font-bold text-emerald-400">
+                        {formatCurrency(acc.availableCash, acc.baseCurrency)}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+                <div className="pt-2 border-t border-slate-800">
+                  <button
+                    onClick={() => {
+                      setAccountDropdownOpen(false);
+                      setShowCreateModal(true);
+                    }}
+                    className="w-full flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-750 text-xs font-semibold text-emerald-400 transition-colors"
+                  >
+                    <Plus className="w-3.5 h-3.5" /> Add Country Account
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -153,6 +222,94 @@ export const Navbar: React.FC = () => {
           </Link>
         )}
       </div>
+
+      {/* Modal for Creating Country Virtual Account */}
+      {showCreateModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md bg-navy-900 border border-slate-800 rounded-2xl p-6 shadow-2xl space-y-5">
+            <div>
+              <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                <Globe className="w-5 h-5 text-emerald-400" />
+                Initialize Country Demo Account
+              </h3>
+              <p className="text-xs text-slate-400 mt-1">
+                Select your country to allocate native virtual demo capital and currency.
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="text-xs font-semibold text-slate-300 block mb-1.5">Country & Demo Allocation</label>
+                <select
+                  value={selectedCountry.code}
+                  onChange={(e) => {
+                    const found = COUNTRY_OPTIONS.find(c => c.code === e.target.value);
+                    if (found) setSelectedCountry(found);
+                  }}
+                  className="w-full bg-navy-950 border border-slate-750 rounded-xl px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-emerald-500"
+                >
+                  {COUNTRY_OPTIONS.map((c) => (
+                    <option key={c.code} value={c.code}>
+                      {c.name} — {formatCurrency(c.balance, c.currency)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-slate-300 block mb-1.5">Account Label (Optional)</label>
+                <input
+                  type="text"
+                  placeholder={`e.g. ${selectedCountry.name} Portfolio`}
+                  value={accountName}
+                  onChange={(e) => setAccountName(e.target.value)}
+                  className="w-full bg-navy-950 border border-slate-750 rounded-xl px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+
+              <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-xs text-slate-300 space-y-1">
+                <div className="font-semibold text-emerald-400">Allocated Starting Funds:</div>
+                <div className="font-mono text-base font-bold text-white">
+                  {formatCurrency(selectedCountry.balance, selectedCountry.currency)}
+                </div>
+                <div className="text-[11px] text-slate-400">
+                  Fully segregated virtual funds with native double-entry ledger.
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowCreateModal(false)}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    await createAccount(
+                      selectedCountry.code,
+                      selectedCountry.currency,
+                      selectedCountry.balance,
+                      accountName.trim() || `${selectedCountry.name} Account`
+                    );
+                    setShowCreateModal(false);
+                    setAccountName('');
+                  } catch (err: any) {
+                    alert(err.message || 'Error creating account');
+                  }
+                }}
+                className="px-5 py-2 rounded-xl text-xs font-bold bg-emerald-500 hover:bg-emerald-400 text-navy-950 transition-colors shadow-lg shadow-emerald-500/20"
+              >
+                Create Account
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </header>
   );
 };

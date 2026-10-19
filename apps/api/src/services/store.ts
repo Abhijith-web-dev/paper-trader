@@ -11,7 +11,9 @@ import {
   UserProfile, 
   VirtualAccount, 
   Watchlist, 
-  BacktestResult 
+  BacktestResult,
+  TradeJournalEntry,
+  Achievement
 } from '@globaltrade/shared';
 import { 
   LedgerAccounting, 
@@ -26,13 +28,16 @@ class InMemoryStore {
   users: Map<string, UserProfile> = new Map();
   preferences: Map<string, UserPreferences> = new Map();
   accounts: Map<string, VirtualAccount> = new Map();
-  accountByUser: Map<string, string> = new Map();
+  accountsByUser: Map<string, VirtualAccount[]> = new Map();
+  activeAccountByUser: Map<string, string> = new Map();
   ledger: Map<string, LedgerEntry[]> = new Map();
   orders: Map<string, Order> = new Map();
   positions: Map<string, Map<string, Position>> = new Map(); // accountId -> (symbol -> Position)
   watchlists: Map<string, Watchlist[]> = new Map();
   alerts: Map<string, PriceAlert[]> = new Map();
   backtests: Map<string, BacktestResult[]> = new Map();
+  journalEntries: Map<string, TradeJournalEntry[]> = new Map();
+  achievements: Map<string, Achievement[]> = new Map();
   idempotencyKeys: Set<string> = new Set();
 }
 
@@ -70,7 +75,9 @@ export class TradingStore {
 
     const defaultPrefs: UserPreferences = {
       userId,
+      country: 'US',
       baseCurrency: 'USD',
+      preferredExchange: 'NASDAQ',
       timezone: 'America/New_York',
       experienceLevel: 'BEGINNER',
       theme: 'dark'
@@ -90,38 +97,71 @@ export class TradingStore {
     return updated;
   }
 
-  // --- Virtual Account & Balance ---
-  static async getVirtualAccount(userId: string): Promise<VirtualAccount> {
+  // --- Multi-Account Management ---
+  static async listUserAccounts(userId: string): Promise<VirtualAccount[]> {
     if (this.firestore) {
       const snap = await this.firestore.collection('virtual_accounts')
         .where('userId', '==', userId)
-        .limit(1)
         .get();
-
       if (!snap.empty) {
-        return snap.docs[0].data() as VirtualAccount;
+        return snap.docs.map(d => d.data() as VirtualAccount);
       }
     } else {
-      const accId = memory.accountByUser.get(userId);
-      if (accId && memory.accounts.has(accId)) {
-        return memory.accounts.get(accId)!;
+      const list = memory.accountsByUser.get(userId);
+      if (list && list.length > 0) return list;
+    }
+
+    // Default init
+    const defaultAcc = await this.initializeVirtualAccount(userId, 'USD', 100000, 'US', 'US Dollar Demo');
+    return [defaultAcc];
+  }
+
+  static async getVirtualAccount(userId: string, explicitAccountId?: string): Promise<VirtualAccount> {
+    if (explicitAccountId) {
+      if (this.firestore) {
+        const doc = await this.firestore.collection('virtual_accounts').doc(explicitAccountId).get();
+        if (doc.exists) return doc.data() as VirtualAccount;
+      } else {
+        const acc = memory.accounts.get(explicitAccountId);
+        if (acc) return acc;
       }
     }
 
-    // Initialize virtual account if not present
-    return this.initializeVirtualAccount(userId, 'USD', 100000);
+    const activeId = memory.activeAccountByUser.get(userId);
+    if (activeId && memory.accounts.has(activeId)) {
+      return memory.accounts.get(activeId)!;
+    }
+
+    const accounts = await this.listUserAccounts(userId);
+    if (accounts.length > 0) {
+      memory.activeAccountByUser.set(userId, accounts[0].id);
+      return accounts[0];
+    }
+
+    return this.initializeVirtualAccount(userId, 'USD', 100000, 'US', 'US Dollar Demo');
+  }
+
+  static async switchActiveAccount(userId: string, accountId: string): Promise<VirtualAccount> {
+    const accounts = await this.listUserAccounts(userId);
+    const target = accounts.find(a => a.id === accountId);
+    if (!target) throw new Error(`Account ${accountId} not found for user`);
+    memory.activeAccountByUser.set(userId, accountId);
+    return target;
   }
 
   static async initializeVirtualAccount(
     userId: string, 
     baseCurrency: string = 'USD', 
-    initialBalance: number = 100000
+    initialBalance: number = 100000,
+    countryCode: string = 'US',
+    name?: string
   ): Promise<VirtualAccount> {
-    const accountId = `acc_${userId.substring(0, 8)}_${Date.now()}`;
+    const accountId = `acc_${baseCurrency.toLowerCase()}_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
     const newAccount: VirtualAccount = {
       id: accountId,
       userId,
-      name: 'Default Virtual Portfolio',
+      name: name || `${baseCurrency} Trading Account`,
+      countryCode,
       baseCurrency,
       initialBalance,
       availableCash: initialBalance,
@@ -144,7 +184,10 @@ export class TradingStore {
       await batch.commit();
     } else {
       memory.accounts.set(accountId, updatedAccount);
-      memory.accountByUser.set(userId, accountId);
+      const existingList = memory.accountsByUser.get(userId) || [];
+      existingList.push(updatedAccount);
+      memory.accountsByUser.set(userId, existingList);
+      memory.activeAccountByUser.set(userId, accountId);
       memory.ledger.set(accountId, [ledgerEntry]);
       memory.positions.set(accountId, new Map());
     }
@@ -296,6 +339,7 @@ export class TradingStore {
             quantity: match.trade.quantity,
             averageEntryPrice: match.trade.price,
             currentPrice: currentQuote.price,
+            currency: currentQuote.currency,
             unrealizedPnl: 0,
             realizedPnl: 0,
             totalCost: fillTotal,
@@ -536,5 +580,85 @@ export class TradingStore {
       return snap.docs.map(d => d.data() as BacktestResult);
     }
     return memory.backtests.get(userId) || [];
+  }
+
+  // --- Trade Journal ---
+  static async getJournalEntries(userId: string, accountId?: string): Promise<TradeJournalEntry[]> {
+    if (this.firestore) {
+      let query = this.firestore.collection('trade_journal').where('userId', '==', userId);
+      if (accountId) query = query.where('accountId', '==', accountId);
+      const snap = await query.orderBy('createdAt', 'desc').get();
+      return snap.docs.map(d => d.data() as TradeJournalEntry);
+    }
+    const all = memory.journalEntries.get(userId) || [];
+    if (accountId) return all.filter(e => e.accountId === accountId);
+    return all;
+  }
+
+  static async createJournalEntry(userId: string, data: Omit<TradeJournalEntry, 'id' | 'userId' | 'createdAt' | 'updatedAt'>): Promise<TradeJournalEntry> {
+    const entry: TradeJournalEntry = {
+      ...data,
+      id: `jnl_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      userId,
+      createdAt: Date.now(),
+      updatedAt: Date.now()
+    };
+
+    if (this.firestore) {
+      await this.firestore.collection('trade_journal').doc(entry.id).set(entry);
+    } else {
+      const list = memory.journalEntries.get(userId) || [];
+      list.unshift(entry);
+      memory.journalEntries.set(userId, list);
+    }
+    return entry;
+  }
+
+  // --- Gamified Achievements & Learning Progress ---
+  static async getAchievements(userId: string): Promise<Achievement[]> {
+    const DEFAULT_ACHIEVEMENTS: Achievement[] = [
+      { id: 'ach_first_trade', code: 'FIRST_TRADE', title: 'Market Explorer', description: 'Executed your first simulated market order', category: 'TRADING', isUnlocked: false },
+      { id: 'ach_cross_border', code: 'CROSS_BORDER', title: 'Global Diversifier', description: 'Traded an international stock across foreign exchanges', category: 'TRADING', isUnlocked: false },
+      { id: 'ach_stop_loss', code: 'RISK_MANAGER', title: 'Disciplined Trader', description: 'Placed a protective Stop or Stop-Limit order', category: 'RISK_MANAGEMENT', isUnlocked: false },
+      { id: 'ach_journaler', code: 'JOURNAL_LOGGED', title: 'Reflective Mind', description: 'Logged trade rationale and lessons in Trade Journal', category: 'LEARNING', isUnlocked: false },
+      { id: 'ach_backtest', code: 'QUANT_TESTER', title: 'Strategy Backtester', description: 'Simulated a historical algorithmic strategy backtest', category: 'BACKTESTING', isUnlocked: false },
+      { id: 'ach_multi_acc', code: 'MULTI_CURRENCY', title: 'Sovereign Treasury', description: 'Created or traded in multiple currency demo accounts', category: 'TRADING', isUnlocked: false }
+    ];
+
+    if (this.firestore) {
+      const snap = await this.firestore.collection('user_achievements').where('userId', '==', userId).get();
+      const unlockedCodes = new Set(snap.docs.map(d => d.data().code));
+      return DEFAULT_ACHIEVEMENTS.map(a => ({
+        ...a,
+        isUnlocked: unlockedCodes.has(a.code)
+      }));
+    }
+
+    const userAch = memory.achievements.get(userId);
+    if (!userAch) {
+      memory.achievements.set(userId, DEFAULT_ACHIEVEMENTS);
+      return DEFAULT_ACHIEVEMENTS;
+    }
+    return userAch;
+  }
+
+  static async unlockAchievement(userId: string, code: string): Promise<Achievement | null> {
+    const list = await this.getAchievements(userId);
+    const target = list.find(a => a.code === code);
+    if (!target || target.isUnlocked) return null;
+
+    target.isUnlocked = true;
+    target.unlockedAt = Date.now();
+
+    if (this.firestore) {
+      await this.firestore.collection('user_achievements').doc(`${userId}_${code}`).set({
+        userId,
+        code,
+        unlockedAt: target.unlockedAt
+      });
+    } else {
+      memory.achievements.set(userId, list);
+    }
+    return target;
   }
 }

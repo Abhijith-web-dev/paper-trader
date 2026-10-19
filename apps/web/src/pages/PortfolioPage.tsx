@@ -13,7 +13,9 @@ import {
   PieChart,
   Wallet,
   ShieldCheck,
-  CheckCircle2
+  CheckCircle2,
+  AlertTriangle,
+  Globe
 } from 'lucide-react';
 
 export const PortfolioPage: React.FC = () => {
@@ -133,6 +135,75 @@ export const PortfolioPage: React.FC = () => {
           <p className="text-[11px] text-slate-500">Booked from closed positions</p>
         </div>
       </div>
+
+      {/* Portfolio Risk & Exposure Analysis Card */}
+      {summary?.riskAnalysis && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="md:col-span-2 p-5 rounded-2xl bg-navy-900 border border-slate-800 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                <AlertTriangle className="w-4 h-4 text-amber-400" /> Concentration Risk Analysis
+              </span>
+              <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full ${
+                summary.riskAnalysis.concentrationRisk === 'HIGH'
+                  ? 'bg-red-500/10 text-red-400 border border-red-500/20'
+                  : summary.riskAnalysis.concentrationRisk === 'MODERATE'
+                  ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                  : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+              }`}>
+                {summary.riskAnalysis.concentrationRisk} RISK
+              </span>
+            </div>
+
+            <div className="flex items-center gap-4 text-xs text-slate-300">
+              <div>
+                <span className="text-[10px] text-slate-500 block">Top Holding Symbol</span>
+                <span className="font-mono font-bold text-white text-sm">{summary.riskAnalysis.topHoldingSymbol}</span>
+              </div>
+              <div className="border-l border-slate-800 pl-4">
+                <span className="text-[10px] text-slate-500 block">Top Asset Weight</span>
+                <span className="font-mono font-bold text-white text-sm">{summary.riskAnalysis.topHoldingWeightPercent}%</span>
+              </div>
+            </div>
+
+            {summary.riskAnalysis.warnings.length > 0 ? (
+              <div className="space-y-1 pt-1">
+                {summary.riskAnalysis.warnings.map((w, i) => (
+                  <div key={i} className="text-xs text-amber-300/90 bg-amber-500/10 border border-amber-500/20 px-3 py-1.5 rounded-xl">
+                    ⚠️ {w}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-emerald-400/90 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 rounded-xl">
+                ✓ Portfolio concentration is balanced (no single security exceeds 20% total equity).
+              </p>
+            )}
+          </div>
+
+          <div className="p-5 rounded-2xl bg-navy-900 border border-slate-800 space-y-3">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+              <Globe className="w-4 h-4 text-blue-400" /> Currency Exposure
+            </span>
+            <div className="space-y-2">
+              {summary.riskAnalysis.currencyExposures.map(exp => (
+                <div key={exp.currency} className="space-y-1">
+                  <div className="flex justify-between text-xs">
+                    <span className="font-mono font-semibold text-slate-200">{exp.currency}</span>
+                    <span className="font-mono text-slate-400">{exp.percentage}%</span>
+                  </div>
+                  <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                    <div 
+                      className="bg-emerald-400 h-full rounded-full" 
+                      style={{ width: `${Math.min(100, Math.max(2, exp.percentage))}%` }} 
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Holdings Table */}
       <div className="rounded-2xl bg-navy-900 border border-slate-800 overflow-hidden shadow-xl space-y-3 p-5">

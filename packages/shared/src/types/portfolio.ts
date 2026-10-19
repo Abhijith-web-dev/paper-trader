@@ -2,7 +2,8 @@ export interface VirtualAccount {
   id: string;
   userId: string;
   name: string;
-  baseCurrency: string;       // "USD", "INR", "EUR"
+  countryCode: string;        // "US", "IN", "UK", "EU", "JP", "AU"
+  baseCurrency: string;       // "USD", "INR", "GBP", "EUR", "JPY", "AUD"
   initialBalance: number;
   availableCash: number;
   reservedCash: number;
@@ -17,7 +18,8 @@ export type LedgerTransactionType =
   | 'BUY_EXECUTION'
   | 'SELL_EXECUTION'
   | 'FEE'
-  | 'DIVIDEND';
+  | 'DIVIDEND'
+  | 'ADMIN_CORRECTION';
 
 export interface LedgerEntry {
   id: string;
@@ -41,12 +43,29 @@ export interface Position {
   quantity: number;
   averageEntryPrice: number;
   currentPrice: number;
+  currency: string;           // Native instrument currency e.g. "INR", "USD", "GBP"
   unrealizedPnl: number;
   unrealizedPnlPercent?: number;
   realizedPnl: number;
   totalCost: number;
   marketValue: number;
+  convertedMarketValue?: number; // In account's reporting currency
+  fxConversionRate?: number;
   updatedAt: number;
+}
+
+export interface CurrencyExposure {
+  currency: string;
+  marketValue: number;
+  percentage: number;
+}
+
+export interface PortfolioRiskAnalysis {
+  concentrationRisk: 'LOW' | 'MODERATE' | 'HIGH';
+  topHoldingSymbol: string;
+  topHoldingWeightPercent: number;
+  currencyExposures: CurrencyExposure[];
+  warnings: string[];
 }
 
 export interface PortfolioSummary {
@@ -62,4 +81,5 @@ export interface PortfolioSummary {
   dayChange: number;
   dayChangePercent: number;
   positionsCount: number;
+  riskAnalysis?: PortfolioRiskAnalysis;
 }

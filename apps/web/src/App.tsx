@@ -19,6 +19,8 @@ import { LearnPage } from './pages/LearnPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { AdminPage } from './pages/AdminPage';
 import { LoginPage } from './pages/LoginPage';
+import { MarketCoveragePage } from './pages/MarketCoveragePage';
+import { JournalPage } from './pages/JournalPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -40,11 +42,13 @@ export const App: React.FC = () => {
               <Route index element={<LandingPage />} />
               <Route path="dashboard" element={<DashboardPage />} />
               <Route path="markets" element={<MarketsPage />} />
+              <Route path="markets/coverage" element={<MarketCoveragePage />} />
               <Route path="markets/:exchange" element={<MarketsPage />} />
               <Route path="instrument/:symbol" element={<InstrumentDetailPage />} />
               <Route path="forex" element={<ForexPage />} />
               <Route path="portfolio" element={<PortfolioPage />} />
               <Route path="portfolio/holdings" element={<PortfolioPage />} />
+              <Route path="journal" element={<JournalPage />} />
               <Route path="orders" element={<OrdersPage />} />
               <Route path="trade-history" element={<OrdersPage />} />
               <Route path="watchlists" element={<WatchlistsPage />} />

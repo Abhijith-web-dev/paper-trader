@@ -13,6 +13,8 @@ import { alertRoutes } from './routes/alerts.js';
 import { backtestRoutes } from './routes/backtest.js';
 import { fileRoutes } from './routes/files.js';
 import { adminRoutes } from './routes/admin.js';
+import { journalRoutes } from './routes/journal.js';
+import { achievementRoutes } from './routes/achievements.js';
 import { ensureStorageBuckets } from './config/supabaseStorage.js';
 
 dotenv.config();
@@ -51,6 +53,8 @@ async function main() {
   await server.register(backtestRoutes, { prefix: '/api/v1/backtest' });
   await server.register(fileRoutes, { prefix: '/api/v1/files' });
   await server.register(adminRoutes, { prefix: '/api/v1/admin' });
+  await server.register(journalRoutes, { prefix: '/api/v1/journal' });
+  await server.register(achievementRoutes, { prefix: '/api/v1/achievements' });
 
   // Init Supabase storage buckets
   ensureStorageBuckets().catch(() => {});

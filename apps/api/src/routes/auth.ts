@@ -30,17 +30,69 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
   // Onboarding initialization endpoint
   fastify.post('/onboarding', { preHandler: [authGuard] }, async (req, reply) => {
     try {
-      const { baseCurrency, initialBalance, experienceLevel } = req.body as any;
+      const { country, baseCurrency, initialBalance, experienceLevel } = req.body as any;
       const currency = baseCurrency || 'USD';
       const balance = Number(initialBalance) || 100000;
+      const countryCode = country || 'US';
 
       await TradingStore.updatePreferences(req.user!.id, {
+        country: countryCode,
         baseCurrency: currency,
         experienceLevel: experienceLevel || 'BEGINNER'
       });
 
-      const account = await TradingStore.initializeVirtualAccount(req.user!.id, currency, balance);
+      const account = await TradingStore.initializeVirtualAccount(
+        req.user!.id, 
+        currency, 
+        balance, 
+        countryCode,
+        `${currency} Primary Portfolio`
+      );
       return { success: true, account };
+    } catch (err: any) {
+      return reply.status(400).send({ error: err.message });
+    }
+  });
+
+  // Multi-Account endpoints
+  fastify.get('/accounts', { preHandler: [authGuard] }, async (req) => {
+    const accounts = await TradingStore.listUserAccounts(req.user!.id);
+    const active = await TradingStore.getVirtualAccount(req.user!.id);
+    return {
+      accounts,
+      activeAccountId: active.id
+    };
+  });
+
+  fastify.post('/accounts/switch', { preHandler: [authGuard] }, async (req, reply) => {
+    try {
+      const { accountId } = req.body as any;
+      if (!accountId) return reply.status(400).send({ error: 'accountId required' });
+      const active = await TradingStore.switchActiveAccount(req.user!.id, accountId);
+      return { success: true, account: active };
+    } catch (err: any) {
+      return reply.status(400).send({ error: err.message });
+    }
+  });
+
+  fastify.post('/accounts/create', { preHandler: [authGuard] }, async (req, reply) => {
+    try {
+      const { countryCode, baseCurrency, initialBalance, name } = req.body as any;
+      if (!baseCurrency) return reply.status(400).send({ error: 'baseCurrency required' });
+      
+      const balance = Number(initialBalance) || 100000;
+      const newAcc = await TradingStore.initializeVirtualAccount(
+        req.user!.id,
+        baseCurrency,
+        balance,
+        countryCode || 'US',
+        name || `${baseCurrency} Trading Account`
+      );
+
+      // Unlock multi-account achievement
+      await TradingStore.unlockAchievement(req.user!.id, 'MULTI_CURRENCY');
+
+      return reply.status(201).send({ success: true, account: newAcc });
     } catch (err: any) {
       return reply.status(400).send({ error: err.message });
     }

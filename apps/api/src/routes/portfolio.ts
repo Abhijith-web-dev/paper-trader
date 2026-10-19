@@ -52,6 +52,43 @@ export const portfolioRoutes: FastifyPluginAsync = async (fastify) => {
       ? FinancialMath.calculatePercentageChange(totalEquity, account.initialBalance)
       : 0;
 
+    // --- Risk Analysis ---
+    let topHoldingSymbol = 'NONE';
+    let topHoldingWeightPercent = 0;
+    const currencyExposureMap = new Map<string, number>();
+    const warnings: string[] = [];
+
+    // Cash currency exposure
+    currencyExposureMap.set(account.baseCurrency, account.availableCash + account.reservedCash);
+
+    for (const pos of evaluatedPositions) {
+      const posWeight = totalEquity > 0 ? (pos.marketValue / totalEquity) * 100 : 0;
+      if (posWeight > topHoldingWeightPercent) {
+        topHoldingWeightPercent = FinancialMath.round(posWeight, 1);
+        topHoldingSymbol = pos.symbol;
+      }
+
+      // Group currency exposure
+      const cur = pos.currency || account.baseCurrency;
+      const currentCurTotal = currencyExposureMap.get(cur) || 0;
+      currencyExposureMap.set(cur, currentCurTotal + pos.marketValue);
+    }
+
+    if (topHoldingWeightPercent > 35) {
+      warnings.push(`High concentration risk: ${topHoldingSymbol} accounts for ${topHoldingWeightPercent}% of total portfolio value.`);
+    } else if (topHoldingWeightPercent > 20) {
+      warnings.push(`Moderate concentration: single position ${topHoldingSymbol} exceeds 20% weighting.`);
+    }
+
+    const currencyExposures = Array.from(currencyExposureMap.entries()).map(([currency, marketValue]) => ({
+      currency,
+      marketValue: FinancialMath.round(marketValue, 2),
+      percentage: totalEquity > 0 ? FinancialMath.round((marketValue / totalEquity) * 100, 1) : 0
+    }));
+
+    const concentrationRisk: 'LOW' | 'MODERATE' | 'HIGH' = 
+      topHoldingWeightPercent > 35 ? 'HIGH' : topHoldingWeightPercent > 20 ? 'MODERATE' : 'LOW';
+
     const summary: PortfolioSummary = {
       accountId: account.id,
       baseCurrency: account.baseCurrency,
@@ -64,7 +101,14 @@ export const portfolioRoutes: FastifyPluginAsync = async (fastify) => {
       realizedPnl: totalRealizedPnl,
       dayChange: totalUnrealizedPnl,
       dayChangePercent: allTimeReturnPct,
-      positionsCount: evaluatedPositions.length
+      positionsCount: evaluatedPositions.length,
+      riskAnalysis: {
+        concentrationRisk,
+        topHoldingSymbol,
+        topHoldingWeightPercent,
+        currencyExposures,
+        warnings
+      }
     };
 
     return {

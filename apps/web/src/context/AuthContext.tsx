@@ -6,10 +6,13 @@ interface AuthContextType {
   user: UserProfile | null;
   preferences: UserPreferences | null;
   account: VirtualAccount | null;
+  accounts: VirtualAccount[];
   isLoading: boolean;
   loginAsDemo: () => Promise<void>;
   logout: () => void;
   refreshAccount: () => Promise<void>;
+  switchAccount: (accountId: string) => Promise<void>;
+  createAccount: (countryCode: string, currency: string, initialBalance: number, name: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -18,6 +21,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<UserProfile | null>(null);
   const [preferences, setPreferences] = useState<UserPreferences | null>(null);
   const [account, setAccount] = useState<VirtualAccount | null>(null);
+  const [accounts, setAccounts] = useState<VirtualAccount[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchCurrentUser = async () => {
@@ -31,11 +35,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(data.user);
       setPreferences(data.preferences);
       setAccount(data.account);
+
+      const accRes = await ApiClient.get<{ accounts: VirtualAccount[]; activeAccountId: string }>('/auth/accounts');
+      setAccounts(accRes.accounts);
     } catch (err) {
       console.warn('Failed to load user session:', err);
       // Fallback guest state
       setUser(null);
       setAccount(null);
+      setAccounts([]);
     } finally {
       setIsLoading(false);
     }
@@ -74,15 +82,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const switchAccount = async (accountId: string) => {
+    try {
+      const res = await ApiClient.post<{ success: boolean; account: VirtualAccount }>('/auth/accounts/switch', { accountId });
+      setAccount(res.account);
+      await fetchCurrentUser();
+    } catch (err) {
+      console.error('Failed to switch virtual account:', err);
+    }
+  };
+
+  const createAccount = async (countryCode: string, currency: string, initialBalance: number, name: string) => {
+    try {
+      await ApiClient.post('/auth/accounts/create', { countryCode, baseCurrency: currency, initialBalance, name });
+      await fetchCurrentUser();
+    } catch (err) {
+      console.error('Failed to create virtual account:', err);
+      throw err;
+    }
+  };
+
   return (
     <AuthContext.Provider value={{
       user,
       preferences,
       account,
+      accounts,
       isLoading,
       loginAsDemo,
       logout,
-      refreshAccount
+      refreshAccount,
+      switchAccount,
+      createAccount
     }}>
       {children}
     </AuthContext.Provider>
