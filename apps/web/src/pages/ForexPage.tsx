@@ -5,9 +5,7 @@ import { formatCurrency, formatDate } from '../lib/formatters';
 import { 
   ArrowLeftRight, 
   Repeat, 
-  Clock, 
   ShieldCheck, 
-  HelpCircle,
   TrendingUp,
   RefreshCw
 } from 'lucide-react';
@@ -67,10 +65,12 @@ export const ForexPage: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-slate-800">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[#1B222D]">
         <div>
-          <h1 className="text-2xl font-bold text-white tracking-tight flex items-center gap-2">
-            <ArrowLeftRight className="w-6 h-6 text-emerald-400" />
+          <h1 className="text-3xl font-extrabold text-white tracking-tight flex items-center gap-3">
+            <span className="w-9 h-9 rounded-2xl bg-[#CCFF00]/10 border border-[#CCFF00]/20 flex items-center justify-center text-[#CCFF00]">
+              <ArrowLeftRight className="w-5 h-5" />
+            </span>
             <span>Global Currency Converter</span>
           </h1>
           <p className="text-xs text-slate-400 mt-1">
@@ -80,20 +80,20 @@ export const ForexPage: React.FC = () => {
 
         <button
           onClick={fetchRates}
-          className="self-start sm:self-auto p-2 rounded-xl bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-750 transition-colors border border-slate-700 flex items-center gap-2 text-xs"
+          className="self-start sm:self-auto px-4 py-2.5 rounded-full bg-[#10151C] text-slate-300 hover:text-[#CCFF00] hover:border-[#CCFF00] transition-all border border-[#1B222D] flex items-center gap-2 text-xs font-bold"
         >
-          <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+          <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-[#CCFF00]' : ''}`} />
           <span>Refresh Rates</span>
         </button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Converter Card (2 cols) */}
-        <div className="lg:col-span-2 p-6 rounded-2xl bg-navy-900 border border-slate-800 shadow-xl space-y-6">
+        <div className="lg:col-span-2 p-6 md:p-8 rounded-3xl bg-[#0B0F14] border border-[#1B222D] space-y-6">
           <div className="grid grid-cols-1 sm:grid-cols-5 gap-3 items-center">
             {/* From Input */}
-            <div className="sm:col-span-2 space-y-1.5">
-              <label className="text-xs text-slate-400 font-medium">You Convert</label>
+            <div className="sm:col-span-2 space-y-2">
+              <label className="text-xs text-slate-400 font-bold uppercase tracking-wider">You Convert</label>
               <div className="relative">
                 <input
                   type="number"
@@ -101,13 +101,13 @@ export const ForexPage: React.FC = () => {
                   step="any"
                   value={amount}
                   onChange={(e) => setAmount(parseFloat(e.target.value) || 0)}
-                  className="w-full bg-slate-850 border border-slate-750 rounded-xl px-3 py-2.5 text-white font-mono font-bold text-lg focus:outline-none focus:border-emerald-500"
+                  className="w-full bg-[#10151C] border border-[#1B222D] rounded-2xl px-4 py-3 text-white font-mono font-black text-xl focus:outline-none focus:border-[#CCFF00]"
                 />
               </div>
               <select
                 value={fromCurrency}
                 onChange={(e) => setFromCurrency(e.target.value)}
-                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white font-medium focus:outline-none"
+                className="w-full bg-[#10151C] border border-[#1B222D] rounded-2xl px-3 py-2 text-xs text-white font-bold focus:outline-none focus:border-[#CCFF00]"
               >
                 {POPULAR_CURRENCIES.map((c) => (
                   <option key={c.code} value={c.code}>{c.code} - {c.name}</option>
@@ -119,7 +119,7 @@ export const ForexPage: React.FC = () => {
             <div className="sm:col-span-1 flex justify-center py-2 sm:py-0">
               <button
                 onClick={handleSwap}
-                className="p-3 rounded-full bg-slate-800 text-slate-300 hover:text-white hover:bg-emerald-500 hover:text-navy-950 transition-all border border-slate-700 shadow-lg"
+                className="p-3.5 rounded-full bg-[#10151C] text-slate-300 hover:text-black hover:bg-[#CCFF00] transition-all border border-[#1B222D] shadow-lg"
                 title="Swap Currencies"
               >
                 <Repeat className="w-4 h-4" />
@@ -127,15 +127,15 @@ export const ForexPage: React.FC = () => {
             </div>
 
             {/* To Result */}
-            <div className="sm:col-span-2 space-y-1.5">
-              <label className="text-xs text-slate-400 font-medium">Estimated Conversion</label>
-              <div className="w-full bg-slate-850/60 border border-slate-750 rounded-xl px-3 py-2.5 text-emerald-400 font-mono font-bold text-lg truncate">
+            <div className="sm:col-span-2 space-y-2">
+              <label className="text-xs text-slate-400 font-bold uppercase tracking-wider">Estimated Conversion</label>
+              <div className="w-full bg-[#10151C] border border-[#1B222D] rounded-2xl px-4 py-3 text-[#CCFF00] font-mono font-black text-xl truncate">
                 {convertedResult.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 4 })}
               </div>
               <select
                 value={toCurrency}
                 onChange={(e) => setToCurrency(e.target.value)}
-                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white font-medium focus:outline-none"
+                className="w-full bg-[#10151C] border border-[#1B222D] rounded-2xl px-3 py-2 text-xs text-white font-bold focus:outline-none focus:border-[#CCFF00]"
               >
                 {POPULAR_CURRENCIES.map((c) => (
                   <option key={c.code} value={c.code}>{c.code} - {c.name}</option>
@@ -145,10 +145,10 @@ export const ForexPage: React.FC = () => {
           </div>
 
           {/* Rate Summary Strip */}
-          <div className="p-4 rounded-xl bg-slate-850/80 border border-slate-750 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+          <div className="p-5 rounded-2xl bg-[#10151C] border border-[#1B222D] flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
             <div>
-              <span className="text-slate-400">Indicative Market Exchange Rate</span>
-              <p className="font-mono text-base font-bold text-white mt-0.5">
+              <span className="text-slate-400 font-semibold uppercase text-[11px]">Indicative Market Rate</span>
+              <p className="font-mono text-lg font-black text-white mt-0.5">
                 1 {fromCurrency} = {rawRate.toFixed(4)} {toCurrency}
               </p>
             </div>
@@ -159,33 +159,33 @@ export const ForexPage: React.FC = () => {
                   type="checkbox"
                   checked={includeSpread}
                   onChange={(e) => setIncludeSpread(e.target.checked)}
-                  className="rounded bg-slate-800 border-slate-700 text-emerald-500 focus:ring-emerald-500"
+                  className="rounded bg-[#0B0F14] border-[#1B222D] text-[#CCFF00] focus:ring-[#CCFF00]"
                 />
-                <span className="text-xs">Simulate 0.2% Educational Spread</span>
+                <span className="text-xs font-semibold">Simulate 0.2% Educational Spread</span>
               </label>
             </div>
           </div>
 
           {/* 30-Day Historical Rate Trend Table */}
           <div className="space-y-3 pt-2">
-            <h3 className="font-bold text-sm text-white flex items-center gap-2">
-              <TrendingUp className="w-4 h-4 text-emerald-400" />
+            <h3 className="font-extrabold text-base text-white flex items-center gap-2">
+              <TrendingUp className="w-4 h-4 text-[#CCFF00]" />
               <span>30-Day Historical Trend ({fromCurrency} / {toCurrency})</span>
             </h3>
 
-            <div className="max-h-52 overflow-y-auto rounded-xl border border-slate-800">
+            <div className="max-h-56 overflow-y-auto rounded-2xl border border-[#1B222D]">
               <table className="w-full text-left text-xs">
                 <thead>
-                  <tr className="border-b border-slate-800 bg-slate-850 text-slate-400">
-                    <th className="py-2.5 px-3 font-semibold">Date</th>
-                    <th className="py-2.5 px-3 font-semibold text-right">ECB Reference Rate</th>
+                  <tr className="border-b border-[#1B222D] bg-[#10151C]/60 text-slate-400 font-bold">
+                    <th className="py-3 px-4">Date</th>
+                    <th className="py-3 px-4 text-right">ECB Reference Rate</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-800/60 font-mono">
+                <tbody className="divide-y divide-[#1B222D]/60 font-mono">
                   {historicalRates.map((row) => (
-                    <tr key={row.date} className="hover:bg-slate-850/40">
-                      <td className="py-2 px-3 text-slate-300">{row.date}</td>
-                      <td className="py-2 px-3 text-right font-bold text-slate-100">{row.rate.toFixed(4)}</td>
+                    <tr key={row.date} className="hover:bg-[#10151C]/40 transition-colors">
+                      <td className="py-2.5 px-4 text-slate-300">{row.date}</td>
+                      <td className="py-2.5 px-4 text-right font-bold text-white">{row.rate.toFixed(4)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -195,13 +195,13 @@ export const ForexPage: React.FC = () => {
         </div>
 
         {/* Regulatory & Educational Sidebar (1 col) */}
-        <div className="p-6 rounded-2xl bg-navy-900 border border-slate-800 space-y-4 h-fit">
-          <div className="flex items-center gap-2 text-emerald-400 font-bold text-xs uppercase tracking-wider">
+        <div className="p-6 md:p-8 rounded-3xl bg-[#0B0F14] border border-[#1B222D] space-y-4 h-fit">
+          <div className="flex items-center gap-2 text-[#CCFF00] font-extrabold text-xs uppercase tracking-wider">
             <ShieldCheck className="w-4 h-4" />
             <span>Forex Educational Notice</span>
           </div>
 
-          <h3 className="font-bold text-sm text-white">Indicative Rates Only</h3>
+          <h3 className="font-extrabold text-base text-white">Indicative Rates Only</h3>
           <p className="text-xs text-slate-400 leading-relaxed">
             All foreign exchange conversion rates displayed on this platform are for educational and simulation purposes derived from the European Central Bank.
           </p>
@@ -209,18 +209,18 @@ export const ForexPage: React.FC = () => {
             These figures do not represent guaranteed bank transfer quotes, retail remittance offers, or executable order book bid-asks.
           </p>
 
-          <div className="p-3.5 rounded-xl bg-slate-850 border border-slate-750 text-[11px] text-slate-300 space-y-1">
+          <div className="p-4 rounded-2xl bg-[#10151C] border border-[#1B222D] text-[11px] text-slate-300 space-y-2">
             <div className="flex justify-between">
               <span className="text-slate-400">Source:</span>
-              <span className="font-semibold text-white">Frankfurter / ECB</span>
+              <span className="font-bold text-white">Frankfurter / ECB</span>
             </div>
             <div className="flex justify-between">
               <span className="text-slate-400">Cache TTL:</span>
-              <span className="font-semibold text-emerald-400">60 Seconds</span>
+              <span className="font-bold text-[#CCFF00]">60 Seconds</span>
             </div>
             <div className="flex justify-between">
               <span className="text-slate-400">Precision:</span>
-              <span className="font-semibold text-white">4 Decimal Places</span>
+              <span className="font-bold text-white font-mono">4 Decimal Places</span>
             </div>
           </div>
         </div>

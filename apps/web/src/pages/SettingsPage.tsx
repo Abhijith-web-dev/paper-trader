@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { ApiClient } from '../lib/apiClient';
 import { uploadUserAvatar } from '../lib/supabaseClient';
-import { Settings, User, Wallet, Globe, Shield, CheckCircle2, Upload } from 'lucide-react';
+import { Settings, User, Wallet, CheckCircle2, Upload } from 'lucide-react';
 
 export const SettingsPage: React.FC = () => {
   const { user, preferences, refreshAccount } = useAuth();
@@ -47,9 +47,11 @@ export const SettingsPage: React.FC = () => {
   return (
     <div className="space-y-6 max-w-3xl">
       {/* Header */}
-      <div className="pb-2 border-b border-slate-800">
-        <h1 className="text-2xl font-bold text-white tracking-tight flex items-center gap-2">
-          <Settings className="w-6 h-6 text-emerald-400" />
+      <div className="pb-4 border-b border-[#1B222D]">
+        <h1 className="text-3xl font-extrabold text-white tracking-tight flex items-center gap-3">
+          <span className="w-9 h-9 rounded-2xl bg-[#CCFF00]/10 border border-[#CCFF00]/20 flex items-center justify-center text-[#CCFF00]">
+            <Settings className="w-5 h-5" />
+          </span>
           <span>Account & Trading Preferences</span>
         </h1>
         <p className="text-xs text-slate-400 mt-1">
@@ -58,32 +60,32 @@ export const SettingsPage: React.FC = () => {
       </div>
 
       {saved && (
-        <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold flex items-center gap-2">
+        <div className="p-4 rounded-2xl bg-[#CCFF00]/10 border border-[#CCFF00]/30 text-[#CCFF00] text-xs font-bold flex items-center gap-2">
           <CheckCircle2 className="w-4 h-4" />
           <span>Preferences updated successfully!</span>
         </div>
       )}
 
       {/* Avatar & Profile Card (Supabase Storage integration) */}
-      <div className="p-6 rounded-2xl bg-navy-900 border border-slate-800 shadow-xl space-y-4">
-        <h2 className="font-bold text-sm text-white flex items-center gap-2">
-          <User className="w-4 h-4 text-emerald-400" />
+      <div className="p-6 md:p-8 rounded-3xl bg-[#0B0F14] border border-[#1B222D] space-y-5">
+        <h2 className="font-extrabold text-base text-white flex items-center gap-2">
+          <User className="w-4 h-4 text-[#CCFF00]" />
           <span>Profile & Avatar (Stored via Supabase Storage)</span>
         </h2>
 
         <div className="flex items-center gap-5">
-          <div className="w-16 h-16 rounded-2xl bg-slate-850 border border-slate-750 flex items-center justify-center overflow-hidden relative group">
+          <div className="w-20 h-20 rounded-3xl bg-[#10151C] border border-[#1B222D] flex items-center justify-center overflow-hidden relative group">
             {avatarUrl ? (
               <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
             ) : (
-              <span className="font-bold text-xl text-emerald-400">
+              <span className="font-mono font-black text-2xl text-[#CCFF00]">
                 {user?.displayName.substring(0, 2).toUpperCase() || 'TR'}
               </span>
             )}
           </div>
 
-          <div className="space-y-1.5 text-xs">
-            <label className="cursor-pointer inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-750 text-slate-200 font-semibold border border-slate-700 transition-colors">
+          <div className="space-y-2 text-xs">
+            <label className="cursor-pointer inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#10151C] hover:border-[#CCFF00] hover:text-[#CCFF00] text-slate-200 font-bold border border-[#1B222D] transition-all">
               <Upload className="w-3.5 h-3.5" />
               <span>{uploading ? 'Uploading...' : 'Upload Image to Supabase'}</span>
               <input type="file" accept="image/*" onChange={handleAvatarChange} className="hidden" />
@@ -94,19 +96,19 @@ export const SettingsPage: React.FC = () => {
       </div>
 
       {/* Trading Preferences Form */}
-      <div className="p-6 rounded-2xl bg-navy-900 border border-slate-800 shadow-xl space-y-4">
-        <h2 className="font-bold text-sm text-white flex items-center gap-2">
-          <Wallet className="w-4 h-4 text-emerald-400" />
+      <div className="p-6 md:p-8 rounded-3xl bg-[#0B0F14] border border-[#1B222D] space-y-5">
+        <h2 className="font-extrabold text-base text-white flex items-center gap-2">
+          <Wallet className="w-4 h-4 text-[#CCFF00]" />
           <span>Trading & Portfolio Currency</span>
         </h2>
 
         <form onSubmit={handleSavePreferences} className="space-y-4 text-xs">
-          <div className="space-y-1">
-            <label className="text-slate-400 font-medium">Reporting Base Currency</label>
+          <div className="space-y-1.5">
+            <label className="text-slate-400 font-bold">Reporting Base Currency</label>
             <select
               value={baseCurrency}
               onChange={(e) => setBaseCurrency(e.target.value)}
-              className="w-full bg-slate-850 border border-slate-750 rounded-xl px-3 py-2 text-white font-medium focus:outline-none focus:border-emerald-500"
+              className="w-full bg-[#10151C] border border-[#1B222D] rounded-2xl px-4 py-3 text-white font-medium focus:outline-none focus:border-[#CCFF00]"
             >
               <option value="USD">USD ($) - US Dollar</option>
               <option value="INR">INR (₹) - Indian Rupee</option>
@@ -114,12 +116,12 @@ export const SettingsPage: React.FC = () => {
             </select>
           </div>
 
-          <div className="space-y-1">
-            <label className="text-slate-400 font-medium">Trading Experience Level</label>
+          <div className="space-y-1.5">
+            <label className="text-slate-400 font-bold">Trading Experience Level</label>
             <select
               value={experienceLevel}
               onChange={(e) => setExperienceLevel(e.target.value as any)}
-              className="w-full bg-slate-850 border border-slate-750 rounded-xl px-3 py-2 text-white font-medium focus:outline-none focus:border-emerald-500"
+              className="w-full bg-[#10151C] border border-[#1B222D] rounded-2xl px-4 py-3 text-white font-medium focus:outline-none focus:border-[#CCFF00]"
             >
               <option value="BEGINNER">Beginner (Guided tooltips & simulated risk warnings)</option>
               <option value="INTERMEDIATE">Intermediate (Standard order book & indicators)</option>
@@ -127,12 +129,12 @@ export const SettingsPage: React.FC = () => {
             </select>
           </div>
 
-          <div className="space-y-1">
-            <label className="text-slate-400 font-medium">Market Timezone Display</label>
+          <div className="space-y-1.5">
+            <label className="text-slate-400 font-bold">Market Timezone Display</label>
             <select
               value={timezone}
               onChange={(e) => setTimezone(e.target.value)}
-              className="w-full bg-slate-850 border border-slate-750 rounded-xl px-3 py-2 text-white font-medium focus:outline-none focus:border-emerald-500"
+              className="w-full bg-[#10151C] border border-[#1B222D] rounded-2xl px-4 py-3 text-white font-medium focus:outline-none focus:border-[#CCFF00]"
             >
               <option value="America/New_York">Eastern Time (NYSE / NASDAQ)</option>
               <option value="Asia/Kolkata">IST (NSE / BSE India)</option>
@@ -143,7 +145,7 @@ export const SettingsPage: React.FC = () => {
 
           <button
             type="submit"
-            className="px-5 py-2.5 rounded-xl bg-emerald-500 text-navy-950 font-bold text-xs hover:bg-emerald-400 transition-colors shadow-lg shadow-emerald-500/20"
+            className="px-6 py-3 rounded-full bg-[#CCFF00] hover:bg-[#D4FF33] text-black font-extrabold text-xs transition-all shadow-lg shadow-[#CCFF00]/15"
           >
             Save Preferences
           </button>

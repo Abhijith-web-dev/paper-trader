@@ -1,14 +1,7 @@
 import React, { useState } from 'react';
 import { 
   GraduationCap, 
-  BookOpen, 
-  CheckCircle2, 
-  HelpCircle, 
-  ShieldCheck, 
-  Award,
-  ChevronRight,
-  TrendingUp,
-  AlertTriangle
+  HelpCircle
 } from 'lucide-react';
 
 interface Module {
@@ -94,10 +87,12 @@ export const LearnPage: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="pb-2 border-b border-slate-800">
-        <h1 className="text-2xl font-bold text-white tracking-tight flex items-center gap-2">
-          <GraduationCap className="w-6 h-6 text-emerald-400" />
-          <span>Financial Market Education & Academy</span>
+      <div className="pb-4 border-b border-[#1B222D]">
+        <h1 className="text-3xl font-extrabold text-white tracking-tight flex items-center gap-3">
+          <span className="w-9 h-9 rounded-2xl bg-[#CCFF00]/10 border border-[#CCFF00]/20 flex items-center justify-center text-[#CCFF00]">
+            <GraduationCap className="w-5 h-5" />
+          </span>
+          <span>Financial Market Academy</span>
         </h1>
         <p className="text-xs text-slate-400 mt-1">
           Master international market mechanics, order types, risk controls, and technical indicators
@@ -107,7 +102,7 @@ export const LearnPage: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Module List (1 Col) */}
         <div className="space-y-3">
-          <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400 px-1">Curriculum Modules</h2>
+          <h2 className="text-xs font-extrabold uppercase tracking-wider text-slate-400 px-1">Curriculum Modules</h2>
           {MODULES.map((m) => (
             <button
               key={m.id}
@@ -116,17 +111,17 @@ export const LearnPage: React.FC = () => {
                 setSelectedAnswer(null);
                 setShowExplanation(false);
               }}
-              className={`w-full p-4 rounded-2xl text-left transition-all border ${
+              className={`w-full p-5 rounded-3xl text-left transition-all border ${
                 selectedModule.id === m.id
-                  ? 'bg-emerald-500/10 border-emerald-500/30 text-white shadow-lg'
-                  : 'bg-navy-900 border-slate-800 text-slate-300 hover:bg-slate-850/60'
+                  ? 'bg-[#CCFF00]/10 border-[#CCFF00] text-white shadow-lg shadow-[#CCFF00]/10'
+                  : 'bg-[#0B0F14] border-[#1B222D] text-slate-300 hover:bg-[#10151C]'
               }`}
             >
-              <div className="flex items-center justify-between text-[10px] text-slate-400 mb-1">
-                <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-semibold">{m.category}</span>
-                <span>{m.readTime}</span>
+              <div className="flex items-center justify-between text-[11px] text-slate-400 mb-1.5">
+                <span className="px-2.5 py-0.5 rounded-full bg-[#10151C] text-[#CCFF00] font-bold border border-[#1B222D]">{m.category}</span>
+                <span className="font-mono">{m.readTime}</span>
               </div>
-              <h3 className="font-bold text-sm text-white">{m.title}</h3>
+              <h3 className="font-extrabold text-sm text-white">{m.title}</h3>
               <p className="text-xs text-slate-400 mt-1 line-clamp-2 leading-relaxed">{m.description}</p>
             </button>
           ))}
@@ -134,33 +129,33 @@ export const LearnPage: React.FC = () => {
 
         {/* Selected Lesson Reader & Quiz (2 Cols) */}
         <div className="lg:col-span-2 space-y-5">
-          <div className="p-6 rounded-2xl bg-navy-900 border border-slate-800 shadow-xl space-y-4">
-            <div className="flex items-center justify-between text-xs text-slate-400 border-b border-slate-800 pb-3">
-              <span className="font-bold text-emerald-400 uppercase tracking-wider">{selectedModule.category}</span>
-              <span>{selectedModule.readTime} read</span>
+          <div className="p-6 md:p-8 rounded-3xl bg-[#0B0F14] border border-[#1B222D] space-y-5">
+            <div className="flex items-center justify-between text-xs text-slate-400 border-b border-[#1B222D] pb-4">
+              <span className="font-extrabold text-[#CCFF00] uppercase tracking-wider">{selectedModule.category}</span>
+              <span className="font-mono">{selectedModule.readTime} read</span>
             </div>
 
-            <h2 className="text-xl font-extrabold text-white">{selectedModule.title}</h2>
+            <h2 className="text-2xl font-black text-white">{selectedModule.title}</h2>
 
             <div className="text-slate-300 text-xs leading-relaxed whitespace-pre-line font-sans space-y-2">
               {selectedModule.content}
             </div>
 
             {/* Interactive Knowledge Quiz */}
-            <div className="mt-8 pt-6 border-t border-slate-800 space-y-4">
-              <div className="flex items-center gap-2 text-white font-bold text-sm">
-                <HelpCircle className="w-4 h-4 text-emerald-400" />
+            <div className="mt-8 pt-6 border-t border-[#1B222D] space-y-4">
+              <div className="flex items-center gap-2 text-white font-extrabold text-base">
+                <HelpCircle className="w-5 h-5 text-[#CCFF00]" />
                 <span>Knowledge Check</span>
               </div>
 
-              <p className="text-xs text-slate-200 font-medium">{selectedModule.quiz.question}</p>
+              <p className="text-xs text-slate-200 font-bold">{selectedModule.quiz.question}</p>
 
-              <div className="space-y-2">
+              <div className="space-y-2.5">
                 {selectedModule.quiz.options.map((opt, idx) => {
-                  let btnStyle = 'bg-slate-850 border-slate-750 text-slate-300 hover:bg-slate-800';
+                  let btnStyle = 'bg-[#10151C] border-[#1B222D] text-slate-300 hover:border-slate-600';
                   if (showExplanation) {
                     if (idx === selectedModule.quiz.correctIndex) {
-                      btnStyle = 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300 font-bold';
+                      btnStyle = 'bg-[#CCFF00]/15 border-[#CCFF00] text-[#CCFF00] font-bold';
                     } else if (idx === selectedAnswer) {
                       btnStyle = 'bg-red-500/20 border-red-500/50 text-red-300';
                     }
@@ -171,7 +166,7 @@ export const LearnPage: React.FC = () => {
                       key={idx}
                       onClick={() => handleOptionSelect(idx)}
                       disabled={showExplanation}
-                      className={`w-full p-3 rounded-xl border text-xs text-left transition-all ${btnStyle}`}
+                      className={`w-full p-4 rounded-2xl border text-xs text-left transition-all ${btnStyle}`}
                     >
                       {opt}
                     </button>
@@ -180,12 +175,12 @@ export const LearnPage: React.FC = () => {
               </div>
 
               {showExplanation && (
-                <div className={`p-4 rounded-xl text-xs space-y-1 ${
+                <div className={`p-4 rounded-2xl text-xs space-y-1 ${
                   isCorrect 
-                    ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-400'
+                    ? 'bg-[#CCFF00]/10 border border-[#CCFF00]/30 text-[#CCFF00]'
                     : 'bg-amber-500/10 border border-amber-500/20 text-amber-300'
                 }`}>
-                  <p className="font-bold">{isCorrect ? 'Correct Answer!' : 'Review Concept'}</p>
+                  <p className="font-black">{isCorrect ? 'Correct Answer!' : 'Review Concept'}</p>
                   <p className="text-slate-300 text-[11px] leading-relaxed">{selectedModule.quiz.explanation}</p>
                 </div>
               )}

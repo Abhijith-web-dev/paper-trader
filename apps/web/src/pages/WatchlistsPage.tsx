@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { ApiClient } from '../lib/apiClient';
 import { MarketQuote, Watchlist } from '@globaltrade/shared';
 import { formatCurrency, formatPercent } from '../lib/formatters';
-import { Star, Plus, Trash2, ArrowUpRight, TrendingUp, TrendingDown } from 'lucide-react';
+import { Star, Plus, Trash2, ArrowUpRight } from 'lucide-react';
 
 export const WatchlistsPage: React.FC = () => {
   const [watchlists, setWatchlists] = useState<Watchlist[]>([]);
@@ -71,10 +71,12 @@ export const WatchlistsPage: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-slate-800">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[#1B222D]">
         <div>
-          <h1 className="text-2xl font-bold text-white tracking-tight flex items-center gap-2">
-            <Star className="w-6 h-6 text-amber-400 fill-amber-400" />
+          <h1 className="text-3xl font-extrabold text-white tracking-tight flex items-center gap-3">
+            <span className="w-9 h-9 rounded-2xl bg-[#CCFF00]/10 border border-[#CCFF00]/20 flex items-center justify-center text-[#CCFF00]">
+              <Star className="w-5 h-5 fill-[#CCFF00]" />
+            </span>
             <span>Market Watchlists</span>
           </h1>
           <p className="text-xs text-slate-400 mt-1">
@@ -89,13 +91,13 @@ export const WatchlistsPage: React.FC = () => {
             placeholder="Add ticker (e.g. TSLA, INFY.NS)"
             value={newSymbol}
             onChange={(e) => setNewSymbol(e.target.value)}
-            className="bg-navy-900 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500 uppercase font-mono"
+            className="bg-[#10151C] border border-[#1B222D] rounded-full px-4 py-2 text-xs text-white focus:outline-none focus:border-[#CCFF00] uppercase font-mono"
           />
           <button
             type="submit"
-            className="px-3 py-1.5 rounded-xl bg-emerald-500 text-navy-950 font-bold text-xs hover:bg-emerald-400 transition-colors flex items-center gap-1 shadow-md shadow-emerald-500/20"
+            className="px-5 py-2 rounded-full bg-[#CCFF00] hover:bg-[#D4FF33] text-black font-extrabold text-xs transition-all flex items-center gap-1.5 shadow-md shadow-[#CCFF00]/15"
           >
-            <Plus className="w-3.5 h-3.5" />
+            <Plus className="w-3.5 h-3.5 stroke-[3]" />
             <span>Add</span>
           </button>
         </form>
@@ -108,43 +110,43 @@ export const WatchlistsPage: React.FC = () => {
           const isUp = (q?.changePercent ?? 0) >= 0;
 
           return (
-            <div key={sym} className="p-4 rounded-2xl bg-navy-900 border border-slate-800 hover:border-slate-700 transition-all space-y-3 shadow-lg relative group">
+            <div key={sym} className="p-6 rounded-3xl bg-[#0B0F14] border border-[#1B222D] hover:border-[#CCFF00]/40 transition-all space-y-4 relative group">
               <div className="flex items-start justify-between">
                 <div>
-                  <Link to={`/instrument/${sym}`} className="font-bold text-base text-white hover:text-emerald-400 transition-colors block">
+                  <Link to={`/instrument/${sym}`} className="font-extrabold text-lg text-white hover:text-[#CCFF00] transition-colors block">
                     {sym}
                   </Link>
-                  <span className="text-[11px] text-slate-400 uppercase font-medium">{q?.provider || 'Live'}</span>
+                  <span className="text-[11px] text-slate-400 uppercase font-semibold">{q?.provider || 'Live'}</span>
                 </div>
 
                 <button
                   onClick={() => handleRemoveSymbol(sym)}
-                  className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-all"
+                  className="opacity-0 group-hover:opacity-100 p-2 rounded-full text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-all"
                   title="Remove from Watchlist"
                 >
-                  <Trash2 className="w-3.5 h-3.5" />
+                  <Trash2 className="w-4 h-4" />
                 </button>
               </div>
 
               <div className="flex items-baseline justify-between font-mono">
-                <span className="text-xl font-extrabold text-white">
+                <span className="text-2xl font-black text-white">
                   {q ? formatCurrency(q.price, q.currency) : '—'}
                 </span>
-                <span className={`px-2 py-0.5 rounded-md text-xs font-bold ${
-                  isUp ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'
+                <span className={`px-2.5 py-1 rounded-full text-xs font-black ${
+                  isUp ? 'bg-[#CCFF00]/10 text-[#CCFF00] border border-[#CCFF00]/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'
                 }`}>
                   {q ? formatPercent(q.changePercent) : '0.00%'}
                 </span>
               </div>
 
-              <div className="pt-2 border-t border-slate-800 flex items-center justify-between">
-                <span className="text-[10px] text-slate-500 font-medium">Session: {q?.marketStatus || 'OPEN'}</span>
+              <div className="pt-3 border-t border-[#1B222D] flex items-center justify-between">
+                <span className="text-[11px] text-slate-500 font-bold">Session: {q?.marketStatus || 'OPEN'}</span>
                 <Link
                   to={`/instrument/${sym}`}
-                  className="text-xs font-semibold text-emerald-400 hover:underline flex items-center gap-1"
+                  className="text-xs font-bold text-[#CCFF00] hover:underline flex items-center gap-1"
                 >
                   <span>Trade</span>
-                  <ArrowUpRight className="w-3 h-3" />
+                  <ArrowUpRight className="w-3.5 h-3.5" />
                 </Link>
               </div>
             </div>

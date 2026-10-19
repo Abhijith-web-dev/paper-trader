@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { ApiClient } from '../lib/apiClient';
 import { PriceAlert } from '@globaltrade/shared';
 import { formatCurrency, formatDate } from '../lib/formatters';
-import { Bell, Plus, CheckCircle2, Clock } from 'lucide-react';
+import { Bell } from 'lucide-react';
 
 export const AlertsPage: React.FC = () => {
   const [alerts, setAlerts] = useState<PriceAlert[]>([]);
@@ -44,9 +44,11 @@ export const AlertsPage: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="pb-2 border-b border-slate-800">
-        <h1 className="text-2xl font-bold text-white tracking-tight flex items-center gap-2">
-          <Bell className="w-6 h-6 text-emerald-400" />
+      <div className="pb-4 border-b border-[#1B222D]">
+        <h1 className="text-3xl font-extrabold text-white tracking-tight flex items-center gap-3">
+          <span className="w-9 h-9 rounded-2xl bg-[#CCFF00]/10 border border-[#CCFF00]/20 flex items-center justify-center text-[#CCFF00]">
+            <Bell className="w-5 h-5" />
+          </span>
           <span>Real-Time Price Alerts</span>
         </h1>
         <p className="text-xs text-slate-400 mt-1">
@@ -56,27 +58,27 @@ export const AlertsPage: React.FC = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Create Alert Form (1 Col) */}
-        <div className="p-6 rounded-2xl bg-navy-900 border border-slate-800 shadow-xl space-y-4 h-fit">
-          <h2 className="font-bold text-sm text-white">Create Price Alert</h2>
+        <div className="p-6 md:p-8 rounded-3xl bg-[#0B0F14] border border-[#1B222D] space-y-5 h-fit">
+          <h2 className="font-extrabold text-base text-white">Create Price Alert</h2>
 
-          <form onSubmit={handleCreateAlert} className="space-y-3.5 text-xs">
-            <div className="space-y-1">
-              <label className="text-slate-400">Instrument Symbol</label>
+          <form onSubmit={handleCreateAlert} className="space-y-4 text-xs">
+            <div className="space-y-1.5">
+              <label className="text-slate-400 font-bold">Instrument Symbol</label>
               <input
                 type="text"
                 value={symbol}
                 onChange={(e) => setSymbol(e.target.value.toUpperCase())}
-                className="w-full bg-slate-850 border border-slate-750 rounded-xl px-3 py-2 text-white font-mono uppercase font-bold focus:outline-none focus:border-emerald-500"
+                className="w-full bg-[#10151C] border border-[#1B222D] rounded-2xl px-4 py-3 text-white font-mono uppercase font-bold focus:outline-none focus:border-[#CCFF00]"
                 required
               />
             </div>
 
-            <div className="space-y-1">
-              <label className="text-slate-400">Condition</label>
+            <div className="space-y-1.5">
+              <label className="text-slate-400 font-bold">Condition</label>
               <select
                 value={condition}
                 onChange={(e) => setCondition(e.target.value as any)}
-                className="w-full bg-slate-850 border border-slate-750 rounded-xl px-3 py-2 text-white font-medium focus:outline-none focus:border-emerald-500"
+                className="w-full bg-[#10151C] border border-[#1B222D] rounded-2xl px-4 py-3 text-white font-medium focus:outline-none focus:border-[#CCFF00]"
               >
                 <option value="ABOVE">Price Rises Above (&gt;=)</option>
                 <option value="BELOW">Price Drops Below (&lt;=)</option>
@@ -84,21 +86,21 @@ export const AlertsPage: React.FC = () => {
               </select>
             </div>
 
-            <div className="space-y-1">
-              <label className="text-slate-400">Target Value</label>
+            <div className="space-y-1.5">
+              <label className="text-slate-400 font-bold">Target Value</label>
               <input
                 type="number"
                 step="any"
                 value={targetPrice}
                 onChange={(e) => setTargetPrice(parseFloat(e.target.value) || 0)}
-                className="w-full bg-slate-850 border border-slate-750 rounded-xl px-3 py-2 text-white font-mono font-bold focus:outline-none focus:border-emerald-500"
+                className="w-full bg-[#10151C] border border-[#1B222D] rounded-2xl px-4 py-3 text-white font-mono font-bold focus:outline-none focus:border-[#CCFF00]"
                 required
               />
             </div>
 
             <button
               type="submit"
-              className="w-full py-2.5 rounded-xl bg-emerald-500 text-navy-950 font-bold text-xs hover:bg-emerald-400 transition-colors shadow-lg shadow-emerald-500/20"
+              className="w-full py-3.5 rounded-full bg-[#CCFF00] hover:bg-[#D4FF33] text-black font-extrabold text-xs transition-all shadow-lg shadow-[#CCFF00]/15"
             >
               Set Price Alert
             </button>
@@ -106,34 +108,34 @@ export const AlertsPage: React.FC = () => {
         </div>
 
         {/* Existing Alerts (2 Cols) */}
-        <div className="lg:col-span-2 rounded-2xl bg-navy-900 border border-slate-800 overflow-hidden shadow-xl">
-          <div className="p-4 bg-slate-850/50 border-b border-slate-800 font-bold text-sm text-white">
+        <div className="lg:col-span-2 rounded-3xl bg-[#0B0F14] border border-[#1B222D] overflow-hidden p-6 space-y-4">
+          <div className="font-extrabold text-base text-white pb-3 border-b border-[#1B222D]">
             Configured Alerts ({alerts.length})
           </div>
 
-          <div className="divide-y divide-slate-800/60 font-mono text-xs">
+          <div className="divide-y divide-[#1B222D]/60 font-mono text-xs">
             {alerts.length > 0 ? (
               alerts.map((alt) => (
-                <div key={alt.id} className="p-4 flex items-center justify-between hover:bg-slate-850/30">
-                  <div className="space-y-0.5">
-                    <span className="font-bold text-white text-sm font-sans">{alt.symbol}</span>
+                <div key={alt.id} className="py-4 flex items-center justify-between hover:bg-[#10151C]/40 transition-colors px-2 rounded-xl">
+                  <div className="space-y-1">
+                    <span className="font-extrabold text-white text-base font-sans">{alt.symbol}</span>
                     <p className="text-slate-400 font-sans text-xs">
-                      Notify when price is <span className="text-emerald-400 font-bold font-mono">{alt.condition}</span> {formatCurrency(alt.targetPrice)}
+                      Notify when price is <span className="text-[#CCFF00] font-bold font-mono">{alt.condition}</span> {formatCurrency(alt.targetPrice)}
                     </p>
                     <span className="text-[10px] text-slate-500">Created {formatDate(alt.createdAt)}</span>
                   </div>
 
-                  <span className={`px-2.5 py-1 rounded-full text-[10px] font-semibold font-sans ${
+                  <span className={`px-3 py-1 rounded-full text-[10px] font-extrabold font-sans ${
                     alt.status === 'ACTIVE'
-                      ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20'
-                      : 'bg-slate-800 text-slate-400'
+                      ? 'bg-[#CCFF00]/10 text-[#CCFF00] border border-[#CCFF00]/25'
+                      : 'bg-[#10151C] text-slate-400 border border-[#1B222D]'
                   }`}>
                     {alt.status}
                   </span>
                 </div>
               ))
             ) : (
-              <div className="p-10 text-center text-slate-500 font-sans">
+              <div className="py-12 text-center text-slate-500 font-sans">
                 No active price alerts. Use the form on the left to set a notification.
               </div>
             )}

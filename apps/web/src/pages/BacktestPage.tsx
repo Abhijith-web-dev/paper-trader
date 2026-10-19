@@ -5,18 +5,9 @@ import { formatCurrency, formatPercent } from '../lib/formatters';
 import { 
   FlaskConical, 
   Play, 
-  TrendingUp, 
-  TrendingDown, 
-  Activity, 
-  Percent, 
-  Award,
-  Layers,
-  ArrowRight,
-  BookOpen,
-  Calendar,
-  Sparkles,
-  CheckCircle2,
-  HelpCircle
+  BookOpen, 
+  Sparkles, 
+  CheckCircle2 
 } from 'lucide-react';
 
 const DATASET_PRESETS: BacktestDatasetPreset[] = [
@@ -142,21 +133,21 @@ export const BacktestPage: React.FC = () => {
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
       {/* Header */}
-      <div className="pb-4 border-b border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="pb-4 border-b border-[#1B222D] flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2 text-emerald-400 font-semibold text-xs tracking-wider uppercase mb-1">
+          <div className="flex items-center gap-2 text-[#CCFF00] font-extrabold text-xs tracking-wider uppercase mb-1">
             <FlaskConical className="w-4 h-4" /> Quantitative Strategy Lab
           </div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+          <h1 className="text-3xl font-extrabold text-white tracking-tight">
             Historical Strategy Backtesting
           </h1>
-          <p className="text-xs sm:text-sm text-slate-400 mt-1 max-w-2xl leading-relaxed">
+          <p className="text-xs text-slate-400 mt-1 max-w-2xl leading-relaxed">
             Test trading models against genuine historical datasets (US equities, Indian NSE, global indices, and crypto) with simulated execution slippage and zero look-ahead bias.
           </p>
         </div>
 
-        <div className="flex items-center gap-2 text-xs bg-emerald-500/10 border border-emerald-500/20 px-3 py-2 rounded-xl text-emerald-300">
-          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+        <div className="flex items-center gap-2 text-xs bg-[#CCFF00]/10 border border-[#CCFF00]/25 px-4 py-2.5 rounded-full text-[#CCFF00] font-bold">
+          <CheckCircle2 className="w-4 h-4 text-[#CCFF00] shrink-0" />
           <span>Real Historical Prices • Split-Adjusted</span>
         </div>
       </div>
@@ -164,26 +155,26 @@ export const BacktestPage: React.FC = () => {
       {/* Beginner-Friendly Dataset Quick Presets */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <span className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-            <Sparkles className="w-4 h-4 text-amber-400" /> Curated Backtesting Datasets for Learners
+          <span className="text-xs font-extrabold uppercase tracking-wider text-slate-400 flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-[#CCFF00]" /> Curated Datasets for Learners
           </span>
-          <span className="text-[11px] text-slate-500">Click any preset to prefill optimal strategy rules</span>
+          <span className="text-[11px] text-slate-500">Click any preset to prefill optimal strategy parameters</span>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
           {DATASET_PRESETS.map((preset) => (
             <button
               key={preset.id}
               onClick={() => handleApplyPreset(preset)}
-              className={`p-3 rounded-xl border text-left transition-all ${
+              className={`p-4 rounded-3xl border text-left transition-all ${
                 symbol === preset.symbol
-                  ? 'bg-emerald-500/15 border-emerald-500/50 shadow-lg shadow-emerald-500/10'
-                  : 'bg-navy-900/80 border-slate-800 hover:border-slate-700 hover:bg-slate-850/60'
+                  ? 'bg-[#CCFF00]/15 border-[#CCFF00] shadow-lg shadow-[#CCFF00]/10'
+                  : 'bg-[#0B0F14] border-[#1B222D] hover:border-slate-700 hover:bg-[#10151C]'
               }`}
             >
               <div className="font-mono font-bold text-xs text-white">{preset.symbol}</div>
               <div className="text-[11px] text-slate-400 truncate mt-0.5">{preset.name.split('(')[0]}</div>
-              <div className="text-[10px] text-emerald-400 font-semibold mt-1">
+              <div className="text-[10px] text-[#CCFF00] font-extrabold mt-1">
                 {preset.defaultStrategy.replace('_', ' ')}
               </div>
             </button>
@@ -191,43 +182,43 @@ export const BacktestPage: React.FC = () => {
         </div>
 
         {/* Selected Preset Educational Callout */}
-        <div className="p-3.5 rounded-xl bg-slate-850/60 border border-slate-750/80 flex items-start gap-3 text-xs">
-          <BookOpen className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-          <div className="space-y-0.5">
-            <span className="font-semibold text-white">{selectedPreset.name}: </span>
+        <div className="p-4 rounded-3xl bg-[#0B0F14] border border-[#1B222D] flex items-start gap-3 text-xs">
+          <BookOpen className="w-4 h-4 text-[#CCFF00] shrink-0 mt-0.5" />
+          <div className="space-y-1">
+            <span className="font-bold text-white">{selectedPreset.name}: </span>
             <span className="text-slate-300">{selectedPreset.description} </span>
-            <span className="text-emerald-400 block pt-0.5 font-medium">💡 Educator Tip: {selectedPreset.educationalNote}</span>
+            <span className="text-[#CCFF00] block pt-0.5 font-bold">💡 Educator Tip: {selectedPreset.educationalNote}</span>
           </div>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Strategy Configuration Form (1 Col) */}
-        <div className="p-6 rounded-2xl bg-navy-900 border border-slate-800 shadow-xl space-y-4 h-fit">
-          <h2 className="font-bold text-sm text-white flex items-center justify-between">
+        <div className="p-6 md:p-8 rounded-3xl bg-[#0B0F14] border border-[#1B222D] space-y-5 h-fit">
+          <h2 className="font-extrabold text-base text-white flex items-center justify-between">
             <span>Simulation Parameters</span>
-            <span className="text-[10px] font-mono text-slate-500">Zero Lookahead</span>
+            <span className="text-[11px] font-mono text-[#CCFF00] font-bold">Zero Lookahead</span>
           </h2>
 
           <form onSubmit={handleRunBacktest} className="space-y-4 text-xs">
-            <div className="space-y-1">
-              <label className="text-slate-400 font-semibold">Target Ticker Symbol</label>
+            <div className="space-y-1.5">
+              <label className="text-slate-400 font-bold">Target Ticker Symbol</label>
               <input
                 type="text"
                 value={symbol}
                 onChange={(e) => setSymbol(e.target.value.toUpperCase())}
                 placeholder="e.g. AAPL, RELIANCE.NS, BTC-USD"
-                className="w-full bg-slate-850 border border-slate-750 rounded-xl px-3 py-2 text-white font-mono font-bold uppercase focus:outline-none focus:border-emerald-500"
+                className="w-full bg-[#10151C] border border-[#1B222D] rounded-2xl px-4 py-3 text-white font-mono font-bold uppercase focus:outline-none focus:border-[#CCFF00]"
                 required
               />
             </div>
 
-            <div className="space-y-1">
-              <label className="text-slate-400 font-semibold">Quantitative Strategy Model</label>
+            <div className="space-y-1.5">
+              <label className="text-slate-400 font-bold">Quantitative Strategy Model</label>
               <select
                 value={strategy}
                 onChange={(e) => setStrategy(e.target.value as any)}
-                className="w-full bg-slate-850 border border-slate-750 rounded-xl px-3 py-2 text-white font-medium focus:outline-none focus:border-emerald-500"
+                className="w-full bg-[#10151C] border border-[#1B222D] rounded-2xl px-4 py-3 text-white font-medium focus:outline-none focus:border-[#CCFF00]"
               >
                 <option value="SMA_CROSSOVER">Dual Moving Average Crossover (Fast vs Slow SMA)</option>
                 <option value="RSI_REVERSAL">RSI Mean Reversion (Overbought / Oversold)</option>
@@ -235,13 +226,13 @@ export const BacktestPage: React.FC = () => {
               </select>
             </div>
 
-            <div className="grid grid-cols-2 gap-2">
-              <div className="space-y-1">
-                <label className="text-slate-400 font-semibold">Historical Lookback</label>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <label className="text-slate-400 font-bold">Historical Lookback</label>
                 <select
                   value={lookbackDays}
                   onChange={(e) => setLookbackDays(Number(e.target.value))}
-                  className="w-full bg-slate-850 border border-slate-750 rounded-xl px-3 py-2 text-white font-mono"
+                  className="w-full bg-[#10151C] border border-[#1B222D] rounded-2xl px-4 py-3 text-white font-mono"
                 >
                   <option value={90}>90 Days (3 Months)</option>
                   <option value={180}>180 Days (6 Months)</option>
@@ -250,85 +241,85 @@ export const BacktestPage: React.FC = () => {
                 </select>
               </div>
 
-              <div className="space-y-1">
-                <label className="text-slate-400 font-semibold">Virtual Capital ($)</label>
+              <div className="space-y-1.5">
+                <label className="text-slate-400 font-bold">Virtual Capital ($)</label>
                 <input
                   type="number"
                   value={initialCapital}
                   onChange={(e) => setInitialCapital(Number(e.target.value))}
-                  className="w-full bg-slate-850 border border-slate-750 rounded-xl px-3 py-2 text-white font-mono font-bold focus:outline-none focus:border-emerald-500"
+                  className="w-full bg-[#10151C] border border-[#1B222D] rounded-2xl px-4 py-3 text-white font-mono font-bold focus:outline-none focus:border-[#CCFF00]"
                   required
                 />
               </div>
             </div>
 
             {strategy === 'SMA_CROSSOVER' && (
-              <div className="grid grid-cols-2 gap-2 p-3 bg-slate-850/40 border border-slate-800 rounded-xl">
+              <div className="grid grid-cols-2 gap-3 p-4 bg-[#10151C] border border-[#1B222D] rounded-2xl">
                 <div className="space-y-1">
-                  <label className="text-slate-400">Fast SMA (Days)</label>
+                  <label className="text-slate-400 font-medium">Fast SMA (Days)</label>
                   <input
                     type="number"
                     min="3"
                     max="50"
                     value={fastPeriod}
                     onChange={(e) => setFastPeriod(Number(e.target.value))}
-                    className="w-full bg-slate-850 border border-slate-750 rounded-lg px-2.5 py-1.5 text-white font-mono"
+                    className="w-full bg-[#0B0F14] border border-[#1B222D] rounded-xl px-3 py-2 text-white font-mono"
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-slate-400">Slow SMA (Days)</label>
+                  <label className="text-slate-400 font-medium">Slow SMA (Days)</label>
                   <input
                     type="number"
                     min="10"
                     max="200"
                     value={slowPeriod}
                     onChange={(e) => setSlowPeriod(Number(e.target.value))}
-                    className="w-full bg-slate-850 border border-slate-750 rounded-lg px-2.5 py-1.5 text-white font-mono"
+                    className="w-full bg-[#0B0F14] border border-[#1B222D] rounded-xl px-3 py-2 text-white font-mono"
                   />
                 </div>
               </div>
             )}
 
             {strategy === 'RSI_REVERSAL' && (
-              <div className="grid grid-cols-2 gap-2 p-3 bg-slate-850/40 border border-slate-800 rounded-xl">
+              <div className="grid grid-cols-2 gap-3 p-4 bg-[#10151C] border border-[#1B222D] rounded-2xl">
                 <div className="space-y-1">
-                  <label className="text-slate-400">Oversold Trigger (Buy)</label>
+                  <label className="text-slate-400 font-medium">Oversold (Buy)</label>
                   <input
                     type="number"
                     min="10"
                     max="45"
                     value={rsiOversold}
                     onChange={(e) => setRsiOversold(Number(e.target.value))}
-                    className="w-full bg-slate-850 border border-slate-750 rounded-lg px-2.5 py-1.5 text-white font-mono"
+                    className="w-full bg-[#0B0F14] border border-[#1B222D] rounded-xl px-3 py-2 text-white font-mono"
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-slate-400">Overbought Trigger (Sell)</label>
+                  <label className="text-slate-400 font-medium">Overbought (Sell)</label>
                   <input
                     type="number"
                     min="55"
                     max="90"
                     value={rsiOverbought}
                     onChange={(e) => setRsiOverbought(Number(e.target.value))}
-                    className="w-full bg-slate-850 border border-slate-750 rounded-lg px-2.5 py-1.5 text-white font-mono"
+                    className="w-full bg-[#0B0F14] border border-[#1B222D] rounded-xl px-3 py-2 text-white font-mono"
                   />
                 </div>
               </div>
             )}
 
-            <div className="p-3 bg-navy-950 rounded-xl border border-slate-800 text-[11px] text-slate-400 space-y-1">
+            <div className="p-4 bg-[#10151C] rounded-2xl border border-[#1B222D] text-[11px] text-slate-400 space-y-1.5">
               <div className="flex justify-between">
                 <span>Simulated Exchange Fee:</span>
-                <span className="font-mono text-slate-300">0.05%</span>
+                <span className="font-mono text-slate-200 font-bold">0.05%</span>
               </div>
               <div className="flex justify-between">
                 <span>Execution Slippage:</span>
-                <span className="font-mono text-slate-300">0.05%</span>
+                <span className="font-mono text-slate-200 font-bold">0.05%</span>
               </div>
             </div>
 
             {error && (
-              <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs">
+              <div className="p-4 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs">
                 {error}
               </div>
             )}
@@ -336,9 +327,9 @@ export const BacktestPage: React.FC = () => {
             <button
               type="submit"
               disabled={isRunning}
-              className="w-full py-3 rounded-xl bg-emerald-500 text-navy-950 font-bold text-xs hover:bg-emerald-400 transition-colors flex items-center justify-center gap-1.5 shadow-lg shadow-emerald-500/20 disabled:opacity-50"
+              className="w-full py-3.5 rounded-full bg-[#CCFF00] text-black font-extrabold text-xs hover:bg-[#D4FF33] transition-all flex items-center justify-center gap-2 shadow-lg shadow-[#CCFF00]/15 disabled:opacity-50"
             >
-              <Play className="w-4 h-4 fill-navy-950" />
+              <Play className="w-4 h-4 fill-black" />
               <span>{isRunning ? 'Streaming Historical Candles...' : 'Execute Backtest'}</span>
             </button>
           </form>
@@ -350,33 +341,33 @@ export const BacktestPage: React.FC = () => {
             <>
               {/* Metrics Grid */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <div className="p-4 rounded-xl bg-navy-900 border border-slate-800 space-y-1">
-                  <span className="text-[11px] text-slate-400">Strategy Return</span>
-                  <div className={`font-mono text-xl font-extrabold ${result.totalReturnPercent >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                <div className="p-5 rounded-3xl bg-[#0B0F14] border border-[#1B222D] space-y-1">
+                  <span className="text-[11px] font-bold text-slate-400 uppercase">Strategy Return</span>
+                  <div className={`font-mono text-2xl font-black ${result.totalReturnPercent >= 0 ? 'text-[#CCFF00]' : 'text-red-400'}`}>
                     {formatPercent(result.totalReturnPercent)}
                   </div>
                   <span className="text-[10px] text-slate-500">Benchmark: {formatPercent(result.benchmarkReturnPercent)}</span>
                 </div>
 
-                <div className="p-4 rounded-xl bg-navy-900 border border-slate-800 space-y-1">
-                  <span className="text-[11px] text-slate-400">Max Drawdown</span>
-                  <div className="font-mono text-xl font-extrabold text-red-400">
+                <div className="p-5 rounded-3xl bg-[#0B0F14] border border-[#1B222D] space-y-1">
+                  <span className="text-[11px] font-bold text-slate-400 uppercase">Max Drawdown</span>
+                  <div className="font-mono text-2xl font-black text-red-400">
                     -{result.maxDrawdownPercent.toFixed(2)}%
                   </div>
                   <span className="text-[10px] text-slate-500">Peak-to-trough decline</span>
                 </div>
 
-                <div className="p-4 rounded-xl bg-navy-900 border border-slate-800 space-y-1">
-                  <span className="text-[11px] text-slate-400">Win Rate</span>
-                  <div className="font-mono text-xl font-extrabold text-white">
+                <div className="p-5 rounded-3xl bg-[#0B0F14] border border-[#1B222D] space-y-1">
+                  <span className="text-[11px] font-bold text-slate-400 uppercase">Win Rate</span>
+                  <div className="font-mono text-2xl font-black text-white">
                     {result.winRatePercent.toFixed(1)}%
                   </div>
                   <span className="text-[10px] text-slate-500">{result.winningTrades} of {result.totalTrades} trades</span>
                 </div>
 
-                <div className="p-4 rounded-xl bg-navy-900 border border-slate-800 space-y-1">
-                  <span className="text-[11px] text-slate-400">Profit Factor</span>
-                  <div className="font-mono text-xl font-extrabold text-emerald-400">
+                <div className="p-5 rounded-3xl bg-[#0B0F14] border border-[#1B222D] space-y-1">
+                  <span className="text-[11px] font-bold text-slate-400 uppercase">Profit Factor</span>
+                  <div className="font-mono text-2xl font-black text-[#CCFF00]">
                     {result.profitFactor.toFixed(2)}
                   </div>
                   <span className="text-[10px] text-slate-500">Gross Win / Gross Loss</span>
@@ -384,30 +375,30 @@ export const BacktestPage: React.FC = () => {
               </div>
 
               {/* Trade Log Table */}
-              <div className="rounded-2xl bg-navy-900 border border-slate-800 overflow-hidden shadow-xl space-y-2 p-5">
-                <h3 className="font-bold text-sm text-white">Simulated Execution Log ({result.trades.length} trades)</h3>
+              <div className="rounded-3xl bg-[#0B0F14] border border-[#1B222D] overflow-hidden space-y-3 p-6">
+                <h3 className="font-extrabold text-base text-white">Simulated Execution Log ({result.trades.length} trades)</h3>
                 {result.trades.length > 0 ? (
                   <div className="max-h-72 overflow-y-auto">
                     <table className="w-full text-left text-xs">
                       <thead>
-                        <tr className="border-b border-slate-800 bg-slate-850 text-slate-400 font-semibold">
-                          <th className="py-2.5 px-3">Entry</th>
-                          <th className="py-2.5 px-3">Exit</th>
-                          <th className="py-2.5 px-3 text-right">Entry Price</th>
-                          <th className="py-2.5 px-3 text-right">Exit Price</th>
-                          <th className="py-2.5 px-3 text-right">Shares</th>
-                          <th className="py-2.5 px-3 text-right">Net P&L</th>
+                        <tr className="border-b border-[#1B222D] bg-[#10151C]/60 text-slate-400 font-bold">
+                          <th className="py-3 px-4 rounded-l-xl">Entry</th>
+                          <th className="py-3 px-4">Exit</th>
+                          <th className="py-3 px-4 text-right">Entry Price</th>
+                          <th className="py-3 px-4 text-right">Exit Price</th>
+                          <th className="py-3 px-4 text-right">Shares</th>
+                          <th className="py-3 px-4 text-right rounded-r-xl">Net P&L</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-slate-800/60 font-mono">
+                      <tbody className="divide-y divide-[#1B222D]/60 font-mono">
                         {result.trades.map((t, idx) => (
-                          <tr key={idx} className="hover:bg-slate-850/30">
-                            <td className="py-2.5 px-3 text-slate-300">{t.entryDate}</td>
-                            <td className="py-2.5 px-3 text-slate-300">{t.exitDate}</td>
-                            <td className="py-2.5 px-3 text-right text-slate-200">{formatCurrency(t.entryPrice)}</td>
-                            <td className="py-2.5 px-3 text-right text-slate-200">{formatCurrency(t.exitPrice)}</td>
-                            <td className="py-2.5 px-3 text-right text-white font-bold">{t.quantity}</td>
-                            <td className={`py-2.5 px-3 text-right font-bold ${t.pnl >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                          <tr key={idx} className="hover:bg-[#10151C]/40 transition-colors">
+                            <td className="py-3 px-4 text-slate-300">{t.entryDate}</td>
+                            <td className="py-3 px-4 text-slate-300">{t.exitDate}</td>
+                            <td className="py-3 px-4 text-right text-slate-200">{formatCurrency(t.entryPrice)}</td>
+                            <td className="py-3 px-4 text-right text-slate-200">{formatCurrency(t.exitPrice)}</td>
+                            <td className="py-3 px-4 text-right text-white font-bold">{t.quantity}</td>
+                            <td className={`py-3 px-4 text-right font-black ${t.pnl >= 0 ? 'text-[#CCFF00]' : 'text-red-400'}`}>
                               {formatCurrency(t.pnl)} ({formatPercent(t.pnlPercent)})
                             </td>
                           </tr>
@@ -416,16 +407,18 @@ export const BacktestPage: React.FC = () => {
                     </table>
                   </div>
                 ) : (
-                  <div className="py-8 text-center text-xs text-slate-400">
+                  <div className="py-10 text-center text-xs text-slate-400">
                     No crossover or trigger signals generated during this lookback window. Try adjusting the period lengths or expanding the lookback range.
                   </div>
                 )}
               </div>
             </>
           ) : (
-            <div className="p-12 rounded-2xl bg-navy-900 border border-slate-800 text-center space-y-3">
-              <FlaskConical className="w-10 h-10 text-slate-500 mx-auto" />
-              <h3 className="font-bold text-white text-base">Ready for Strategy Backtest</h3>
+            <div className="p-16 rounded-3xl bg-[#0B0F14] border border-[#1B222D] text-center space-y-4">
+              <div className="w-16 h-16 rounded-3xl bg-[#10151C] border border-[#1B222D] flex items-center justify-center mx-auto text-[#CCFF00]">
+                <FlaskConical className="w-8 h-8" />
+              </div>
+              <h3 className="font-extrabold text-white text-lg">Ready for Strategy Backtest</h3>
               <p className="text-xs text-slate-400 max-w-md mx-auto">
                 Select one of the curated presets above (such as Apple, NVIDIA, Reliance, or S&P 500) to see how algorithmic models perform against genuine historical price action.
               </p>
