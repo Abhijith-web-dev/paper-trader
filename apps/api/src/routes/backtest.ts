@@ -16,8 +16,9 @@ export const backtestRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.status(400).send({ error: 'Symbol and strategy are required' });
       }
 
-      // Fetch 180 days of historical daily candles for the backtest
-      const candles = await provider.getHistoricalCandles(config.symbol, '1d', 180);
+      const lookback = Math.min(Number(config.lookbackDays) || 365, 1095); // up to 3 years
+      // Fetch genuine historical daily candles for the backtest
+      const candles = await provider.getHistoricalCandles(config.symbol, '1d', lookback);
       if (!candles || candles.length < 20) {
         return reply.status(400).send({ error: `Insufficient real historical data for ${config.symbol} (found ${candles.length} candles)` });
       }

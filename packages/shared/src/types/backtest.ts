@@ -1,10 +1,23 @@
 export type StrategyType = 'SMA_CROSSOVER' | 'RSI_REVERSAL' | 'MACD_MOMENTUM' | 'BUY_AND_HOLD';
 
+export interface BacktestDatasetPreset {
+  id: string;
+  name: string;
+  symbol: string;
+  category: 'TECH_LEADERS' | 'INDIAN_GIANTS' | 'MARKET_INDICES' | 'CRYPTO' | 'FOREX';
+  description: string;
+  defaultStrategy: StrategyType;
+  fastPeriod: number;
+  slowPeriod: number;
+  educationalNote: string;
+}
+
 export interface BacktestConfig {
   symbol: string;
   strategy: StrategyType;
-  startDate: string;          // YYYY-MM-DD
-  endDate: string;            // YYYY-MM-DD
+  startDate?: string;         // YYYY-MM-DD
+  endDate?: string;           // YYYY-MM-DD
+  lookbackDays?: number;      // e.g. 90, 180, 365, 730 days
   initialCapital: number;
   fastPeriod?: number;        // e.g. 10 for SMA
   slowPeriod?: number;        // e.g. 50 for SMA
