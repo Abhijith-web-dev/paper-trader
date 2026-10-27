@@ -23,7 +23,9 @@ import {
   RotateCcw, 
   Radio, 
   Layers,
-  Activity
+  Activity,
+  Maximize2,
+  Minimize2
 } from 'lucide-react';
 
 /**
@@ -51,6 +53,7 @@ export default function StockChart({
   activeIndicators: parentIndicators,
   onToggleIndicator: parentOnToggle
 }) {
+  const chartWrapperRef = useRef(null);
   const chartContainerRef = useRef(null);
   const chartInstanceRef = useRef(null);
   const candleSeriesRef = useRef(null);
@@ -62,8 +65,11 @@ export default function StockChart({
   const bbLowerSeriesRef = useRef(null);
   const candlesRef = useRef([]);
 
+  // Fullscreen State
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
   // Chart Configuration State
-  const [timeframe, setTimeframe] = useState('1D'); // '1D' | '1W' | '1M' | '3M' | '1Y'
+  const [timeframe, setTimeframe] = useState('1D'); // '1m' | '3m' | '5m' | '1D' | '1W' | '1M' | '3M' | '1Y'
   const [chartType, setChartType] = useState('candles'); // 'candles' | 'area'
   const [candles, setCandles] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -80,6 +86,75 @@ export default function StockChart({
   // Crosshair HUD Data
   const [hoveredData, setHoveredData] = useState(null);
   const [quoteData, setQuoteData] = useState(null);
+
+  // Fullscreen Mode Toggle Handler
+  const toggleFullscreen = useCallback(async () => {
+    try {
+      if (!isFullscreen) {
+        setIsFullscreen(true);
+        if (chartWrapperRef.current && document.fullscreenEnabled && !document.fullscreenElement) {
+          await chartWrapperRef.current.requestFullscreen().catch(() => {});
+        }
+      } else {
+        setIsFullscreen(false);
+        if (document.fullscreenElement) {
+          await document.exitFullscreen().catch(() => {});
+        }
+      }
+    } catch {
+      // Graceful fallback to CSS overlay
+    }
+  }, [isFullscreen]);
+
+  // Sync state if user exits via browser ESC or native controls
+  useEffect(() => {
+    const handleNativeFsChange = () => {
+      const isNativeFs = Boolean(document.fullscreenElement);
+      if (!isNativeFs && isFullscreen) {
+        setIsFullscreen(false);
+      }
+    };
+
+    document.addEventListener('fullscreenchange', handleNativeFsChange);
+    document.addEventListener('webkitfullscreenchange', handleNativeFsChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', handleNativeFsChange);
+      document.removeEventListener('webkitfullscreenchange', handleNativeFsChange);
+    };
+  }, [isFullscreen]);
+
+  // Keyboard shortcut listener: 'F' toggles Fullscreen, 'Escape' exits Fullscreen
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      const activeTag = document.activeElement?.tagName;
+      const isInput = activeTag === 'INPUT' || activeTag === 'TEXTAREA' || activeTag === 'SELECT';
+
+      if (e.key === 'Escape' && isFullscreen) {
+        e.preventDefault();
+        toggleFullscreen();
+        return;
+      }
+
+      if ((e.key === 'f' || e.key === 'F') && !isInput && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault();
+        toggleFullscreen();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isFullscreen, toggleFullscreen]);
+
+  // Prevent background scrolling when in fullscreen
+  useEffect(() => {
+    if (isFullscreen) {
+      const prevOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = prevOverflow;
+      };
+    }
+  }, [isFullscreen]);
 
   // Keep candlesRef updated
   useEffect(() => {
@@ -198,11 +273,14 @@ export default function StockChart({
     }
 
     const container = chartContainerRef.current;
-    const isIntraday = timeframe === '1D' || timeframe === '1W';
+    const isIntraday = ['1m', '3m', '5m', '1D', '1W'].includes(timeframe);
+    const computedHeight = isFullscreen
+      ? (container.clientHeight || Math.max(480, window.innerHeight - 150))
+      : 480;
 
     const chart = createChart(container, {
       width: container.clientWidth || 800,
-      height: 480,
+      height: computedHeight,
       layout: {
         background: { type: ColorType.Solid, color: '#FFFFFF' },
         textColor: '#1C1917',
@@ -396,8 +474,13 @@ export default function StockChart({
     // Resize Observer for fluid responsiveness
     const handleResize = () => {
       if (chartContainerRef.current && chartInstanceRef.current) {
+        const width = chartContainerRef.current.clientWidth;
+        const height = isFullscreen
+          ? (chartContainerRef.current.clientHeight || Math.max(480, window.innerHeight - 150))
+          : 480;
         chartInstanceRef.current.applyOptions({
-          width: chartContainerRef.current.clientWidth,
+          width,
+          height,
         });
       }
     };
@@ -414,7 +497,31 @@ export default function StockChart({
         chartInstanceRef.current = null;
       }
     };
-  }, [candles, chartType, activeIndicators, timeframe]);
+  }, [candles, chartType, activeIndicators, timeframe, isFullscreen]);
+
+  // Dynamic resize and fit when fullscreen mode toggles
+  useEffect(() => {
+    const applyDimensions = () => {
+      if (chartContainerRef.current && chartInstanceRef.current) {
+        const width = chartContainerRef.current.clientWidth;
+        const height = isFullscreen
+          ? (chartContainerRef.current.clientHeight || Math.max(480, window.innerHeight - 150))
+          : 480;
+        chartInstanceRef.current.applyOptions({
+          width,
+          height,
+        });
+        chartInstanceRef.current.timeScale().fitContent();
+      }
+    };
+
+    const t1 = setTimeout(applyDimensions, 40);
+    const t2 = setTimeout(applyDimensions, 180);
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+    };
+  }, [isFullscreen]);
 
   // Toolbar Handlers
   const handleZoomIn = useCallback(() => {
@@ -455,21 +562,33 @@ export default function StockChart({
   const activeHud = hoveredData || (candles.length > 0 ? candles[candles.length - 1] : null);
 
   return (
-    <div className="w-full flex flex-col bg-white border border-[#111111] shadow-sm select-none">
+    <div 
+      ref={chartWrapperRef}
+      className={
+        isFullscreen 
+          ? "fixed inset-0 z-[9999] flex flex-col bg-white w-screen h-screen select-none overflow-hidden m-0 p-0" 
+          : "w-full flex flex-col bg-white border border-[#111111] shadow-sm select-none"
+      }
+    >
       {/* 1. Masthead Header Bar */}
-      <div className="px-3 py-2.5 sm:px-4 bg-[#FAF8F3] border-b border-[#111111] flex flex-wrap items-center justify-between gap-3">
+      <div className="px-3 py-2.5 sm:px-4 bg-[#FAF8F3] border-b border-[#111111] flex flex-wrap items-center justify-between gap-3 shrink-0">
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 bg-[#111111] text-white flex items-center justify-center font-bold text-xs shadow-sm">
             <BarChart3 className="w-4 h-4 text-white" />
           </div>
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <span className="font-headline font-black text-base sm:text-lg text-[#111111] tracking-tight">
                 {cleanSymbol}
               </span>
               <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 bg-[#111111] text-white">
                 {market}
               </span>
+              {isFullscreen && (
+                <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 bg-amber-400 text-black border border-amber-500 animate-pulse">
+                  FULLSCREEN FOCUS
+                </span>
+              )}
               <div className="flex items-baseline gap-1.5">
                 <span className="font-mono font-black text-base sm:text-lg text-[#111111]">
                   {currencySymbol}{Number(currentPrice).toFixed(2)}
@@ -485,18 +604,49 @@ export default function StockChart({
           </div>
         </div>
 
-        {/* Real-Time Status Pill */}
-        <div className="flex items-center gap-1.5 bg-emerald-50 border border-emerald-300 text-emerald-800 text-[10px] font-bold px-2 py-1 uppercase tracking-wider">
-          <Radio className="w-3 h-3 text-emerald-600 animate-pulse" />
-          <span>Real-Time Engine • 0ms Native Feed</span>
+        {/* Real-Time Status Pill & Fullscreen Toggle Button */}
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 bg-emerald-50 border border-emerald-300 text-emerald-800 text-[10px] font-bold px-2 py-1 uppercase tracking-wider">
+            <Radio className="w-3 h-3 text-emerald-600 animate-pulse" />
+            <span className="hidden sm:inline">Real-Time Engine • 0ms Native Feed</span>
+            <span className="sm:hidden">LIVE FEED</span>
+          </div>
+
+          {/* Fullscreen Mode Toggle Button */}
+          <button
+            type="button"
+            onClick={toggleFullscreen}
+            className={`px-2.5 py-1 text-xs font-bold font-mono border flex items-center gap-1.5 transition-all cursor-pointer ${
+              isFullscreen 
+                ? 'bg-amber-400 hover:bg-amber-300 text-[#111111] border-amber-600 shadow-sm' 
+                : 'bg-[#111111] hover:bg-neutral-800 text-[#F6F4EE] border-[#111111]'
+            }`}
+            title={isFullscreen ? "Exit Fullscreen Mode [ESC or F]" : "Fullscreen Chart Only [F]"}
+          >
+            {isFullscreen ? (
+              <>
+                <Minimize2 className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">EXIT FULLSCREEN</span>
+                <span className="sm:hidden">EXIT</span>
+                <kbd className="px-1 py-0.2 bg-black/20 text-black text-[9px] rounded font-mono">ESC</kbd>
+              </>
+            ) : (
+              <>
+                <Maximize2 className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">FULLSCREEN</span>
+                <span className="sm:hidden">EXPAND</span>
+                <kbd className="hidden md:inline px-1 py-0.2 bg-white/20 text-white text-[9px] rounded font-mono">F</kbd>
+              </>
+            )}
+          </button>
         </div>
       </div>
 
       {/* 2. Interactive Navigation & Indicator Toolbar */}
-      <div className="px-3 py-1.5 bg-white border-b border-stone-200 flex flex-wrap items-center justify-between gap-2 text-xs">
+      <div className="px-3 py-1.5 bg-white border-b border-stone-200 flex flex-wrap items-center justify-between gap-2 text-xs shrink-0">
         {/* Timeframe Selector */}
         <div className="flex items-center gap-1">
-          {['1D', '1W', '1M', '3M', '1Y'].map((tf) => (
+          {['1m', '3m', '5m', '1D', '1W', '1M', '3M', '1Y'].map((tf) => (
             <button
               key={tf}
               onClick={() => setTimeframe(tf)}
@@ -606,12 +756,25 @@ export default function StockChart({
               <RotateCcw className="w-3 h-3" />
               <span>FIT</span>
             </button>
+            <button
+              type="button"
+              onClick={toggleFullscreen}
+              className={`p-1 border flex items-center gap-1 text-[10px] font-mono px-1.5 cursor-pointer transition-colors ${
+                isFullscreen
+                  ? 'bg-amber-400 text-black border-amber-600 hover:bg-amber-300 font-bold'
+                  : 'text-stone-700 hover:bg-stone-100 border-stone-300'
+              }`}
+              title={isFullscreen ? "Exit Fullscreen [ESC or F]" : "Fullscreen Chart [F]"}
+            >
+              {isFullscreen ? <Minimize2 className="w-3 h-3" /> : <Maximize2 className="w-3 h-3" />}
+              <span className="hidden sm:inline">{isFullscreen ? 'EXIT' : 'FULL'}</span>
+            </button>
           </div>
         </div>
       </div>
 
       {/* 3. Live Crosshair Dynamic Metrics HUD Bar */}
-      <div className="px-3 py-1 bg-[#FAF8F3] border-b border-stone-200 flex flex-wrap items-center justify-between text-[11px] font-mono text-stone-600">
+      <div className="px-3 py-1 bg-[#FAF8F3] border-b border-stone-200 flex flex-wrap items-center justify-between text-[11px] font-mono text-stone-600 shrink-0">
         {activeHud ? (
           <div className="flex items-center gap-3 sm:gap-4 flex-wrap">
             <span className="text-stone-400">
@@ -643,19 +806,22 @@ export default function StockChart({
         </div>
       </div>
 
-      {/* 4. Canvas Chart Viewport */}
-      <div className="w-full relative min-h-[460px] bg-white">
+      {/* 4. Canvas Chart Viewport (Fullscreen Flexible Height) */}
+      <div className={`w-full relative bg-white ${isFullscreen ? 'flex-1 min-h-0 h-full' : 'min-h-[460px]'}`}>
         {loading && (
           <div className="absolute inset-0 bg-white/75 backdrop-blur-[1px] flex flex-col items-center justify-center z-10">
             <div className="w-6 h-6 border-2 border-[#111111] border-t-transparent rounded-full animate-spin mb-2" />
             <div className="text-xs font-mono font-bold text-[#111111]">SYNCHRONIZING CANVAS TICKS...</div>
           </div>
         )}
-        <div ref={chartContainerRef} className="w-full h-[460px]" />
+        <div 
+          ref={chartContainerRef} 
+          className={`w-full ${isFullscreen ? 'h-full' : 'h-[460px]'}`} 
+        />
       </div>
 
       {/* 5. Footer Masthead Status Strip */}
-      <div className="px-3 py-1.5 bg-[#FAF8F3] border-t border-[#111111] flex flex-wrap items-center justify-between gap-2 text-[10px] text-stone-600 font-sans">
+      <div className="px-3 py-1.5 bg-[#FAF8F3] border-t border-[#111111] flex flex-wrap items-center justify-between gap-2 text-[10px] text-stone-600 font-sans shrink-0">
         <div className="flex items-center gap-3">
           <span className="flex items-center gap-1 font-mono font-semibold">
             <Activity className="w-3 h-3 text-emerald-700" />
@@ -666,9 +832,16 @@ export default function StockChart({
             TICK TIMEFRAME: {timeframe}
           </span>
         </div>
-        <div className="flex items-center gap-1 text-stone-500 font-mono">
-          <ShieldCheck className="w-3.5 h-3.5 text-stone-600" />
-          <span>ZERO THIRD-PARTY EXTENSIONS • 100% PRIVATE & UNRESTRICTED</span>
+        <div className="flex items-center gap-2 text-stone-500 font-mono">
+          {isFullscreen && (
+            <span className="text-amber-800 font-bold bg-amber-100 px-1.5 py-0.5 border border-amber-300 text-[9px] uppercase tracking-wider">
+              PRESS [ESC] OR CLICK EXIT TO LEAVE FULLSCREEN
+            </span>
+          )}
+          <div className="flex items-center gap-1">
+            <ShieldCheck className="w-3.5 h-3.5 text-stone-600" />
+            <span>ZERO THIRD-PARTY EXTENSIONS • 100% PRIVATE</span>
+          </div>
         </div>
       </div>
     </div>

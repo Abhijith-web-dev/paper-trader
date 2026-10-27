@@ -840,12 +840,17 @@ export async function getStockHistoricalCandles(symbol, timeframe = '1D') {
   const upper = symbol.toUpperCase();
   const targetSymbol = STOCK_DIRECTORY[upper]?.targetSymbol || upper;
 
+  let tf = timeframe || '1D';
+  if (tf === '1min') tf = '1m';
+  if (tf === '3min') tf = '3m';
+  if (tf === '5min') tf = '5m';
+
   // 0. Instant recall from IndexedDB cache if available and fresh
   try {
-    const cached = await getCandlesCache(upper, timeframe);
+    const cached = await getCandlesCache(upper, tf);
     if (cached && (Array.isArray(cached) ? cached.length > 0 : cached?.candles?.length > 0)) {
-      const isIntraday = timeframe === '1D' || timeframe === '1W';
-      const maxAgeMs = isIntraday ? 5 * 60 * 1000 : 4 * 60 * 60 * 1000;
+      const isIntraday = ['1m', '3m', '5m', '1D', '1W'].includes(tf);
+      const maxAgeMs = tf === '1m' ? 60 * 1000 : (tf === '3m' ? 2 * 60 * 1000 : (isIntraday ? 5 * 60 * 1000 : 4 * 60 * 60 * 1000));
       const cachedTime = cached.timestamp || cached.updatedAt || 0;
       if (Date.now() - cachedTime < maxAgeMs) {
         return cached;
@@ -873,11 +878,13 @@ export async function getStockHistoricalCandles(symbol, timeframe = '1D') {
 
   let interval = '5m';
   let range = '1d';
-  if (timeframe === '1D') { interval = '5m'; range = '1d'; }
-  else if (timeframe === '1W') { interval = '15m'; range = '5d'; }
-  else if (timeframe === '1M') { interval = '1d'; range = '1mo'; }
-  else if (timeframe === '3M') { interval = '1d'; range = '3mo'; }
-  else if (timeframe === '1Y') { interval = '1d'; range = '1y'; }
+  if (tf === '1m') { interval = '1m'; range = '1d'; }
+  else if (tf === '3m') { interval = '1m'; range = '1d'; }
+  else if (tf === '5m' || tf === '1D') { interval = '5m'; range = '1d'; }
+  else if (tf === '1W') { interval = '15m'; range = '5d'; }
+  else if (tf === '1M') { interval = '1d'; range = '1mo'; }
+  else if (tf === '3M') { interval = '1d'; range = '3mo'; }
+  else if (tf === '1Y') { interval = '1d'; range = '1y'; }
 
   const queryPath = `/v8/finance/chart/${encodeURIComponent(targetSymbol)}?interval=${interval}&range=${range}`;
   const candidateEndpoints = isDev
@@ -897,8 +904,8 @@ export async function getStockHistoricalCandles(symbol, timeframe = '1D') {
           const timestamps = result.timestamp;
           const quotes = result.indicators.quote[0];
           const previousClose = meta.chartPreviousClose || meta.previousClose || meta.regularMarketPrice;
-          const candles = [];
-          const isIntraday = timeframe === '1D' || timeframe === '1W';
+          let candles = [];
+          const isIntraday = ['1m', '3m', '5m', '1D', '1W'].includes(tf);
 
           for (let i = 0; i < timestamps.length; i++) {
             const open = quotes.open[i];
@@ -922,7 +929,43 @@ export async function getStockHistoricalCandles(symbol, timeframe = '1D') {
             });
           }
 
-          if (candles.length >= 10) {
+          if (tf === '3m' && candles.length > 0) {
+            // Group 1-minute bars into 3-minute buckets (180s epoch)
+            const buckets = new Map();
+            for (const c of candles) {
+              const bucketKey = Math.floor(c.time / 180) * 180;
+              if (!buckets.has(bucketKey)) {
+                buckets.set(bucketKey, []);
+              }
+              buckets.get(bucketKey).push(c);
+            }
+            const aggregated = [];
+            for (const [bTime, bars] of buckets.entries()) {
+              if (!bars || bars.length === 0) continue;
+              const bOpen = bars[0].open;
+              const bClose = bars[bars.length - 1].close;
+              let bHigh = bars[0].high;
+              let bLow = bars[0].low;
+              let bVol = 0;
+              for (const b of bars) {
+                if (b.high > bHigh) bHigh = b.high;
+                if (b.low < bLow) bLow = b.low;
+                bVol += (b.volume || 0);
+              }
+              aggregated.push({
+                time: bTime,
+                open: bOpen,
+                high: Number(bHigh.toFixed(2)),
+                low: Number(bLow.toFixed(2)),
+                close: bClose,
+                volume: bVol,
+              });
+            }
+            candles = aggregated;
+          }
+
+          const minBars = ['1m', '3m', '5m'].includes(tf) ? 5 : 10;
+          if (candles.length >= minBars) {
             const finalRes = {
               candles,
               meta,
@@ -933,9 +976,9 @@ export async function getStockHistoricalCandles(symbol, timeframe = '1D') {
               isIntraday,
               timestamp: Date.now(),
             };
-            saveCandlesCache(upper, timeframe, finalRes);
+            saveCandlesCache(upper, tf, finalRes);
             if (targetSymbol !== upper) {
-              saveCandlesCache(targetSymbol, timeframe, finalRes);
+              saveCandlesCache(targetSymbol, tf, finalRes);
             }
             return finalRes;
           }
@@ -947,8 +990,8 @@ export async function getStockHistoricalCandles(symbol, timeframe = '1D') {
   }
 
   // 3. Client-Side Deterministic Microstructure Synthesis (100% zero server cost, zero backend)
-  const result = synthesizeCandlesticks(upper, metrics, timeframe);
-  saveCandlesCache(upper, timeframe, result);
+  const result = synthesizeCandlesticks(upper, metrics, tf);
+  saveCandlesCache(upper, tf, result);
   return result;
 }
 

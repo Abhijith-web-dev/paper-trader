@@ -27,6 +27,11 @@ function createSeededRandom(seedStr) {
  * Synthesizes calibrated candlesticks for any timeframe with authentic market microstructure
  */
 export function synthesizeCandlesticks(symbol, metrics, timeframe = '1D') {
+  let tf = timeframe || '1D';
+  if (tf === '1min') tf = '1m';
+  if (tf === '3min') tf = '3m';
+  if (tf === '5min') tf = '5m';
+
   const isNSE = symbol.endsWith('.NS');
   const close = Number(metrics.price || metrics.close || 100);
   const open = Number(metrics.open || close);
@@ -41,28 +46,40 @@ export function synthesizeCandlesticks(symbol, metrics, timeframe = '1D') {
   const low52 = Math.min(Number(metrics.low52 || close * 0.85), low);
   const totalVolume = Number(metrics.rawVolume || 2500000);
 
-  const isIntraday = timeframe === '1D' || timeframe === '1W';
+  const isIntraday = ['1m', '3m', '5m', '1D', '1W'].includes(tf);
   const candles = [];
-  const rng = createSeededRandom(`${symbol}_${timeframe}_${new Date().toISOString().split('T')[0]}`);
+  const rng = createSeededRandom(`${symbol}_${tf}_${new Date().toISOString().split('T')[0]}`);
 
   // Check if stock is locked in a circuit freeze (e.g. AGOL.NS at -10% or +10%)
   const changePct = Number(metrics.changePercent || 0);
   const isLowerCircuit = changePct <= -9.5 && Math.abs(close - low) < 0.05;
   const isUpperCircuit = changePct >= 9.5 && Math.abs(close - high) < 0.05;
 
-  if (timeframe === '1D') {
-    // 75 5-minute bars covering full 6.25-hour exchange session
-    const barCount = 75;
-    const current5m = Math.floor(Date.now() / 1000 / 300) * 300;
-    const startTime = current5m - (barCount - 1) * 300;
+  if (['1m', '3m', '5m', '1D'].includes(tf)) {
+    let barCount = 75;
+    let stepSec = 300; // default 5-minute bars
+
+    if (tf === '1m') {
+      barCount = 60; // 60 1-minute bars (1 hour continuous view)
+      stepSec = 60;
+    } else if (tf === '3m') {
+      barCount = 60; // 60 3-minute bars (3 hours view)
+      stepSec = 180;
+    } else if (tf === '5m' || tf === '1D') {
+      barCount = 75; // 75 5-minute bars (full 6.25-hour exchange session)
+      stepSec = 300;
+    }
+
+    const currentBlock = Math.floor(Date.now() / 1000 / stepSec) * stepSec;
+    const startTime = currentBlock - (barCount - 1) * stepSec;
 
     let cur = open;
 
     if (isLowerCircuit) {
       // Circuit Freeze Dynamics: early session drop to lower limit, followed by locked limit
-      const lockBar = Math.floor(barCount * 0.12); // locked after first ~45 mins
+      const lockBar = Math.floor(barCount * 0.12);
       for (let i = 0; i < barCount; i++) {
-        const t = startTime + i * 300;
+        const t = startTime + i * stepSec;
         let bOpen, bClose, bHigh, bLow, vol;
 
         if (i <= lockBar) {
@@ -73,7 +90,6 @@ export function synthesizeCandlesticks(symbol, metrics, timeframe = '1D') {
           bLow = Number(Math.min(bOpen, bClose, close).toFixed(2));
           vol = Math.floor((totalVolume / barCount) * (2.5 - progress * 1.5));
         } else {
-          // Locked in lower circuit with occasional queue transactions
           bOpen = close;
           bClose = close;
           bHigh = close;
@@ -95,7 +111,7 @@ export function synthesizeCandlesticks(symbol, metrics, timeframe = '1D') {
       // Upper Circuit Dynamics: rapid morning surge to upper limit
       const lockBar = Math.floor(barCount * 0.15);
       for (let i = 0; i < barCount; i++) {
-        const t = startTime + i * 300;
+        const t = startTime + i * stepSec;
         let bOpen, bClose, bHigh, bLow, vol;
 
         if (i <= lockBar) {
@@ -130,7 +146,7 @@ export function synthesizeCandlesticks(symbol, metrics, timeframe = '1D') {
       const highIdx = isBullish ? Math.floor(barCount * 0.68) : Math.floor(barCount * 0.18);
 
       for (let i = 0; i < barCount; i++) {
-        const t = startTime + i * 300;
+        const t = startTime + i * stepSec;
         let target;
 
         if (i === 0) {
@@ -153,7 +169,8 @@ export function synthesizeCandlesticks(symbol, metrics, timeframe = '1D') {
           target = startVal + (close - startVal) * ((i - maxInf) / Math.max(1, barCount - 1 - maxInf));
         }
 
-        const spread = Math.max(0.04, high - low);
+        const spreadScale = Math.min(1, Math.max(0.35, stepSec / 300));
+        const spread = Math.max(0.04, (high - low) * spreadScale);
         const microNoise = (Math.sin(i * 1.8 + rng()) * 0.3 + Math.cos(i * 2.4) * 0.2) * (spread * 0.1);
         const bClose = i === barCount - 1 ? close : Number(Math.max(low, Math.min(high, target + microNoise)).toFixed(2));
         const bOpen = Number(cur.toFixed(2));
@@ -161,7 +178,7 @@ export function synthesizeCandlesticks(symbol, metrics, timeframe = '1D') {
         const bHigh = Number(Math.min(high, Math.max(bOpen, bClose) + wick).toFixed(2));
         const bLow = Number(Math.max(low, Math.min(bOpen, bClose) - wick).toFixed(2));
 
-        // Intraday U-shaped volume profile (high at open and close)
+        // Intraday U-shaped volume profile
         const uCurve = (Math.pow((i - barCount / 2) / (barCount / 2), 2) * 1.5 + 0.4);
         const vol = Math.floor((totalVolume / barCount) * uCurve * (0.8 + rng() * 0.4));
 
@@ -176,7 +193,7 @@ export function synthesizeCandlesticks(symbol, metrics, timeframe = '1D') {
         cur = bClose;
       }
     }
-  } else if (timeframe === '1W') {
+  } else if (tf === '1W') {
     // 35 1-hour bars spanning 5 trading days
     const barCount = 35;
     const current1h = Math.floor(Date.now() / 1000 / 3600) * 3600;
@@ -208,8 +225,8 @@ export function synthesizeCandlesticks(symbol, metrics, timeframe = '1D') {
     }
   } else {
     // Daily Calendar bars for 1M, 3M, 1Y
-    const daysCount = timeframe === '1M' ? 22 : timeframe === '3M' ? 65 : 252;
-    const perf = timeframe === '1M' ? perf1M : timeframe === '3M' ? perf3M : perfY;
+    const daysCount = tf === '1M' ? 22 : tf === '3M' ? 65 : 252;
+    const perf = tf === '1M' ? perf1M : tf === '3M' ? perf3M : perfY;
     const startPrice = close / (1 + perf / 100);
 
     const dates = [];

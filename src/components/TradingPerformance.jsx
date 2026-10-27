@@ -166,6 +166,7 @@ export default function TradingPerformance({
   }, [userProfile?.orders]);
 
   const {
+    hasClosedTrades,
     activeSellOrders,
     winningTrades,
     losingTrades,
@@ -893,16 +894,22 @@ export default function TradingPerformance({
                       <div>
                         <span className="text-neutral-500 block text-[10px]">Worst Loser:</span>
                         <span className="font-bold text-red-800 block text-sm">
-                          {hasClosedTrades && minTrade !== null ? `${minTrade.toFixed(2)}` : 'N/A'}
+                          {hasClosedTrades && worstTrade !== null ? `${worstTrade.toFixed(2)}` : 'N/A'}
                         </span>
                       </div>
                       <div>
                         <span className="text-neutral-500 block text-[10px]">Worst Drawdown Trade:</span>
-                        <span className="font-bold text-red-800 block text-sm">{worstTrade.toFixed(2)}</span>
+                        <span className="font-bold text-red-800 block text-sm">
+                          {hasClosedTrades && worstTrade !== null ? `${worstTrade.toFixed(2)}` : 'N/A'}
+                        </span>
                       </div>
                       <div>
                         <span className="text-neutral-500 block text-[10px]">Max Drawdown Value:</span>
-                        <span className="font-bold text-red-800 block text-sm">₹{maxDrawdownAmount.toFixed(2)}</span>
+                        <span className="font-bold text-red-800 block text-sm">
+                          {hasClosedTrades && maxDrawdownAmount > 0 
+                            ? `${isUSOnly ? '$' : '₹'}${maxDrawdownAmount.toFixed(2)}` 
+                            : 'N/A'}
+                        </span>
                       </div>
                       <div>
                         <span className="text-neutral-500 block text-[10px]">Discipline Grade:</span>

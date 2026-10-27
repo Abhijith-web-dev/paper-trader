@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Lock, Mail, ArrowRight, AlertCircle, Sparkles } from 'lucide-react';
+import { Lock, Mail, ArrowRight, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function LoginPage() {
-  const { signin, signup, signInWithGoogle, currentUser, userProfile } = useAuth();
+  const { signin, signInWithGoogle, currentUser } = useAuth();
   const navigate = useNavigate();
 
   const [email, setEmail] = useState('');
@@ -59,34 +59,6 @@ export default function LoginPage() {
       }
     } finally {
       setGoogleLoading(false);
-    }
-  };
-
-  // Instant Demo Account Login for testing
-  const handleQuickDemo = async () => {
-    try {
-      setLoading(true);
-      setError('');
-      await signup({
-        fullName: 'Demo Trader',
-        email: 'trader@papertrading.demo',
-        password: 'PaperTrading2026!',
-        targetCurrency: 'INR',
-        defaultMarket: 'NSE',
-        tradingStyle: 'Day & Swing Trader',
-      });
-      toast.success('Instant Demo Account Activated!');
-      navigate('/dashboard', { replace: true });
-    } catch (err) {
-      try {
-        await signin('trader@papertrading.demo', 'PaperTrading2026!');
-        toast.success('Signed into Demo Account!');
-        navigate('/dashboard', { replace: true });
-      } catch (loginErr) {
-        setError(loginErr.message);
-      }
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -215,19 +187,6 @@ export default function LoginPage() {
               </button>
             </div>
           </form>
-
-          {/* Quick Demo Option */}
-          <div className="mt-4 pt-4 border-t border-[#D8D2C4]">
-            <button
-              type="button"
-              onClick={handleQuickDemo}
-              disabled={loading}
-              className="w-full py-2.5 px-3 bg-[#FAF8F3] hover:bg-[#EFECE3] border border-[#111111] text-[#111111] text-xs font-mono font-bold flex items-center justify-center gap-2 transition-colors cursor-pointer min-h-[40px]"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-amber-700" />
-              <span>Instant 1-Click Demo Account</span>
-            </button>
-          </div>
 
           <div className="mt-6 text-center text-xs font-news text-[#111111]/80">
             Need an account?{' '}
