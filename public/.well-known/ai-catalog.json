@@ -1,0 +1,65 @@
+{
+  "specVersion": "1.0",
+  "host": {
+    "displayName": "Paper Trading Platform",
+    "documentationUrl": "https://abhijith-dev-io.web.app/guide"
+  },
+  "entries": [
+    {
+      "identifier": "urn:air:papertrading:market:simulator",
+      "displayName": "Paper Trading Real-Time Market Simulator",
+      "type": "application/ai-catalog+json",
+      "data": {
+        "description": "Educational zero-risk stock market simulator with live quotes, TradingView charts, and algorithmic backtesting.",
+        "url": "https://abhijith-dev-io.web.app/"
+      },
+      "representativeQueries": [
+        "simulated paper stock trading platform",
+        "live NSE and NASDAQ paper trading simulator",
+        "learn stock trading with virtual portfolio"
+      ]
+    },
+    {
+      "identifier": "urn:air:papertrading:tool:screener",
+      "displayName": "Quantitative Equity Screener",
+      "type": "application/ai-catalog+json",
+      "data": {
+        "description": "Multi-factor stock scanner filtering equities by volume, P/E ratios, and momentum.",
+        "url": "https://abhijith-dev-io.web.app/screener"
+      },
+      "representativeQueries": [
+        "stock screener for NSE India and US equities",
+        "find 52-week high breakout stocks",
+        "filter stocks by valuation and RSI"
+      ]
+    },
+    {
+      "identifier": "urn:air:papertrading:tool:backtester",
+      "displayName": "Algorithmic Strategy Backtester",
+      "type": "application/ai-catalog+json",
+      "data": {
+        "description": "High-performance Web Worker strategy simulator evaluating moving averages and RSI oscillators.",
+        "url": "https://abhijith-dev-io.web.app/backtest"
+      },
+      "representativeQueries": [
+        "backtest stock trading strategies on historical data",
+        "test EMA golden cross strategy win rate",
+        "quantitative paper trading backtest tool"
+      ]
+    },
+    {
+      "identifier": "urn:air:papertrading:academy:guide",
+      "displayName": "Trader Learning Academy & Guide",
+      "type": "application/ai-catalog+json",
+      "data": {
+        "description": "Comprehensive curriculum on financial fundamentals, position sizing, and risk preservation.",
+        "url": "https://abhijith-dev-io.web.app/guide"
+      },
+      "representativeQueries": [
+        "learn stock trading fundamentals from scratch",
+        "position sizing and risk reward guide",
+        "free paper trading academy course"
+      ]
+    }
+  ]
+}

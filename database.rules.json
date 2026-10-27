@@ -1,0 +1,58 @@
+{
+  "rules": {
+    "users": {
+      "$uid": {
+        // Only the authenticated user who owns this UID can read or write their paper trading ledger
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid",
+        
+        "profile": {
+          ".validate": "newData.hasChildren(['fullName', 'email'])",
+          "fullName": {
+            ".validate": "newData.isString() && newData.val().length > 0"
+          },
+          "email": {
+            ".validate": "newData.isString()"
+          }
+        },
+
+        "wallets": {
+          "inr": {
+            ".validate": "newData.hasChildren(['cashBalance'])",
+            "cashBalance": {
+              ".validate": "newData.isNumber() && newData.val() >= 0"
+            }
+          },
+          "usd": {
+            ".validate": "newData.hasChildren(['cashBalance'])",
+            "cashBalance": {
+              ".validate": "newData.isNumber() && newData.val() >= 0"
+            }
+          }
+        },
+
+        "holdings": {
+          ".indexOn": ["market", "symbol"],
+          "$holdingKey": {
+            ".validate": "newData.hasChildren(['symbol', 'quantity', 'avgBuyPrice'])",
+            "quantity": {
+              ".validate": "newData.isNumber() && newData.val() > 0"
+            },
+            "avgBuyPrice": {
+              ".validate": "newData.isNumber() && newData.val() > 0"
+            }
+          }
+        },
+
+        "orders": {
+          ".indexOn": ["timestamp", "market", "symbol", "action", "status"],
+          "$orderId": {
+            // Once written, trade orders are an immutable ledger (cannot be tampered with)
+            ".write": "data.val() === null",
+            ".validate": "newData.hasChildren(['symbol', 'action', 'quantity', 'price', 'timestamp'])"
+          }
+        }
+      }
+    }
+  }
+}

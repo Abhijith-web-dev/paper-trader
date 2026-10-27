@@ -1,0 +1,12 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["react"],
+  "rules": {
+    "no-unused-vars": "off",
+    "react/rules-of-hooks": "error",
+    "react/set-state-in-effect": "off",
+    "react/purity": "off",
+    "react-hooks/exhaustive-deps": "warn",
+    "react/only-export-components": "off"
+  }
+}

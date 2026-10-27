@@ -1,0 +1,22 @@
+User-agent: *
+Allow: /
+Allow: /guide
+Allow: /screener
+Allow: /backtest
+Allow: /disclaimer
+Allow: /privacy
+Allow: /terms
+Allow: /login
+Allow: /signup
+
+# Explicit access for Google AdSense Reviewer & Verification Crawler
+User-agent: Mediapartners-Google
+Allow: /
+
+# Googlebot search indexer
+User-agent: Googlebot
+Allow: /
+
+Disallow: /onboarding
+
+Sitemap: https://abhijith-dev-io.web.app/sitemap.xml

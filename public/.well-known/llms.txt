@@ -1,0 +1,14 @@
+# Paper Trading — Real-Time Global Market Simulator & Educational Platform
+
+> A zero-risk financial simulator engineered to teach technical analysis, position sizing, and risk management across Indian (NSE/BSE) and US (NASDAQ/NYSE) equities.
+
+## Core Capabilities
+- [Live Stock Dashboard & Interactive TradingView Charts](https://abhijith-dev-io.web.app/dashboard): Real-time candlestick charting with technical indicators (SMA, EMA, Bollinger Bands, RSI).
+- [Stock Screener & Market Heatmap](https://abhijith-dev-io.web.app/screener): Multi-factor scanner filtering equities by volume, P/E, 52-week highs, and momentum.
+- [Quantitative Strategy Backtester](https://abhijith-dev-io.web.app/backtest): Local Web Worker algorithmic backtester evaluating EMA Golden Cross, RSI Mean Reversion, and Breakout strategies.
+- [Trader's Academy & Comprehensive Guide](https://abhijith-dev-io.web.app/guide): Systematic curriculum teaching fundamentals, order execution, and risk control.
+
+## Legal Disclosures
+- [Risk & Educational Simulation Disclaimer](https://abhijith-dev-io.web.app/disclaimer): 100% virtual capital simulation with zero real financial monetary risk.
+- [Privacy Policy](https://abhijith-dev-io.web.app/privacy): Local-first browser storage with client-side encryption.
+- [Terms of Service](https://abhijith-dev-io.web.app/terms): Non-brokered educational terms of use.

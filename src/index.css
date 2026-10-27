@@ -1,0 +1,154 @@
+@import "tailwindcss";
+
+@theme {
+  --font-serif: "Playfair Display", Georgia, Cambria, "Times New Roman", Times, serif;
+  --font-headline: "Oswald", "Impact", -apple-system, sans-serif;
+  --font-news: "Newsreader", "Merriweather", Georgia, serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  --font-dotmatrix: "VT323", "DotGothic16", monospace;
+
+  --color-paper-bg: #F6F4EE;
+  --color-paper-surface: #FFFFFF;
+  --color-paper-subtle: #EFECE3;
+  --color-paper-border: #D8D2C4;
+  --color-paper-ink: #111111;
+  --color-paper-dark: #121212;
+}
+
+@layer base {
+  body {
+    background-color: #F6F4EE;
+    color: #111111;
+    font-family: var(--font-news), Georgia, serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Broadsheet Newspaper double-line rules */
+  .border-broadsheet-double {
+    border-style: double;
+    border-width: 4px;
+    border-color: #111111;
+  }
+
+  .border-broadsheet-thin {
+    border-width: 1px;
+    border-color: #111111;
+  }
+
+  /* Inverted Black Callout Box (as seen in newspaper image 'SHORT NOTE MAY GO HERE') */
+  .newspaper-black-box {
+    background-color: #121212;
+    color: #F6F4EE;
+    border: 2px solid #111111;
+  }
+
+  /* Newspaper photo card plate frame */
+  .newspaper-photo-plate {
+    background-color: #FFFFFF;
+    border: 1px solid #111111;
+    box-shadow: 2px 2px 0px #111111;
+  }
+
+  /* Paper Card */
+  .paper-card {
+    background-color: #FFFFFF;
+    border: 1px solid #D8D2C4;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  }
+
+  /* Paper Pressed */
+  .paper-pressed {
+    border: 2px solid #111111;
+    box-shadow: 3px 3px 0px #111111;
+  }
+
+  /* Broadsheet Column Dividers */
+  .broadsheet-divider {
+    border-right: 1px solid #D8D2C4;
+  }
+
+  /* Tabular numbers for clean financial alignment */
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Custom scrollbar matching newsprint theme */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #EFECE3;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #BBB3A1;
+    border-radius: 2px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #8F8674;
+  }
+
+  /* Hide scrollbar for clean horizontal ribbon scrolling */
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  /* Seamless Marquee Animation */
+  @keyframes tickerMarquee {
+    0% {
+      transform: translate3d(0, 0, 0);
+    }
+    100% {
+      transform: translate3d(-50%, 0, 0);
+    }
+  }
+
+  .animate-ticker-marquee {
+    display: flex;
+    width: max-content;
+    animation: tickerMarquee 80s linear infinite;
+    will-change: transform;
+  }
+
+  .animate-ticker-marquee:hover {
+    animation-play-state: paused;
+  }
+
+  /* Digital Dot Matrix LED Display Styling */
+  .font-dot-matrix {
+    font-family: var(--font-dotmatrix), "VT323", "DotGothic16", "Courier New", monospace;
+    letter-spacing: 0.08em;
+  }
+
+  .led-ticker-chassis {
+    background-color: #08090b;
+    background-image: 
+      radial-gradient(rgba(255, 255, 255, 0.09) 1px, transparent 0);
+    background-size: 3px 3px;
+  }
+
+  .led-glow-amber {
+    color: #facc15;
+    text-shadow: 0 0 6px rgba(250, 204, 21, 0.55);
+  }
+
+  .led-glow-green {
+    color: #4ade80;
+    text-shadow: 0 0 6px rgba(74, 222, 128, 0.65);
+  }
+
+  .led-glow-red {
+    color: #f87171;
+    text-shadow: 0 0 6px rgba(248, 113, 113, 0.65);
+  }
+
+  .led-glow-white {
+    color: #f8fafc;
+    text-shadow: 0 0 5px rgba(248, 250, 252, 0.4);
+  }
+}
