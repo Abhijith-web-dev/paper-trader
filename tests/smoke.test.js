@@ -6,8 +6,15 @@
 import assert from 'node:assert/strict';
 import { getQuoteFreshness, validateQuoteBounds } from '../src/lib/quoteFreshness.js';
 import { SCREENER_THRESHOLDS, evaluateStockTechnicalSignal } from '../src/lib/screenerEngine.js';
-import { STOCK_DIRECTORY } from '../src/lib/yahooFinance.js';
+import { STOCK_DIRECTORY, getStockHistoricalCandles } from '../src/lib/yahooFinance.js';
 import { synthesizeCandlesticks } from '../src/lib/microstructureEngine.js';
+import { 
+  validateCandle, 
+  aggregateIntradayCandles, 
+  getExchangeTimezoneMeta, 
+  harmonizeSessionBounds,
+  formatExchangeLocalTime 
+} from '../src/lib/intradayAggregator.js';
 
 console.log('🧪 Starting Automated Smoke Test Suite...');
 
@@ -271,4 +278,152 @@ console.log('  Testing Intraday Candle & Session Range Invariants...');
 }
 console.log('  ✅ Intraday Candle & Session Range Invariants passed.');
 
-console.log('\n🎉 ALL SMOKE TESTS PASSED SUCCESSFULLY! (7/7 test suites)');
+// =========================================================================
+// TEST 8: Candle Validation & Invariant Guard
+// =========================================================================
+console.log('  Testing Candle Invariant Validation...');
+{
+  // 8.1 Valid normal candle
+  const valid = validateCandle({ time: 1000, open: 100, high: 105, low: 98, close: 102, volume: 500 });
+  assert.equal(valid.isValid, true);
+  assert.equal(valid.candle.open, 100);
+  assert.equal(valid.candle.high, 105);
+  assert.equal(valid.candle.low, 98);
+  assert.equal(valid.candle.close, 102);
+  assert.equal(valid.candle.volume, 500);
+
+  // 8.2 Discrepant high < max(open, close) auto-enveloped
+  const highDeficient = validateCandle({ time: 1000, open: 100, high: 99, low: 95, close: 98, volume: 100 });
+  assert.equal(highDeficient.isValid, true);
+  assert.equal(highDeficient.candle.high, 100, 'High must envelope open');
+
+  // 8.3 Discrepant low > min(open, close) auto-enveloped
+  const lowExcessive = validateCandle({ time: 1000, open: 100, high: 110, low: 102, close: 105, volume: 100 });
+  assert.equal(lowExcessive.isValid, true);
+  assert.equal(lowExcessive.candle.low, 100, 'Low must envelope open');
+
+  // 8.4 Corrupt / negative values rejected
+  const negativeClose = validateCandle({ time: 1000, open: 100, high: 105, low: 95, close: -10, volume: 100 });
+  assert.equal(negativeClose.isValid, false);
+
+  const nonNumeric = validateCandle({ time: 1000, open: 'abc', high: 105, low: 95, close: 100, volume: 100 });
+  assert.equal(nonNumeric.isValid, false);
+}
+console.log('  ✅ Candle Invariant Validation passed.');
+
+// =========================================================================
+// TEST 9: Session-Aligned 1m -> 3m & 1m -> 5m Candle Aggregation
+// =========================================================================
+console.log('  Testing Session-Aligned 1m -> 3m & 5m Candle Aggregation...');
+{
+  const sessionStart = 1793072700; // 09:15:00 IST
+
+  // Construct 6 consecutive 1m bars starting at session open
+  const raw1m = [
+    // Bucket 1 (09:15 - 09:18: bars at 09:15, 09:16, 09:17)
+    { time: sessionStart, open: 100.0, high: 102.5, low: 99.5, close: 101.0, volume: 1000 },
+    { time: sessionStart + 60, open: 101.0, high: 104.0, low: 100.5, close: 103.5, volume: 1500 },
+    { time: sessionStart + 120, open: 103.5, high: 103.8, low: 99.0, close: 100.0, volume: 2000 },
+    // Bucket 2 (09:18 - 09:21: bars at 09:18, 09:19, 09:20)
+    { time: sessionStart + 180, open: 100.0, high: 101.5, low: 98.5, close: 99.0, volume: 1200 },
+    { time: sessionStart + 240, open: 99.0, high: 100.0, low: 97.0, close: 97.5, volume: 800 },
+    { time: sessionStart + 300, open: 97.5, high: 98.5, low: 96.0, close: 98.0, volume: 2500 },
+  ];
+
+  // 9.1 Aggregate into 3-minute bars
+  const aggregated3m = aggregateIntradayCandles(raw1m, 3, sessionStart);
+  assert.equal(aggregated3m.length, 2, '6 1m bars must aggregate to exactly 2 3m bars');
+
+  // Verify Bucket 1
+  const b1 = aggregated3m[0];
+  assert.equal(b1.time, sessionStart, 'Bucket 1 time must match sessionStart');
+  assert.equal(b1.open, 100.0, 'Bucket 1 open must be first bar open (100.0)');
+  assert.equal(b1.high, 104.0, 'Bucket 1 high must be max(102.5, 104.0, 103.8) = 104.0');
+  assert.equal(b1.low, 99.0, 'Bucket 1 low must be min(99.5, 100.5, 99.0) = 99.0');
+  assert.equal(b1.close, 100.0, 'Bucket 1 close must be last bar close (100.0)');
+  assert.equal(b1.volume, 4500, 'Bucket 1 volume must be sum(1000 + 1500 + 2000) = 4500');
+
+  // Verify Bucket 2
+  const b2 = aggregated3m[1];
+  assert.equal(b2.time, sessionStart + 180, 'Bucket 2 time must be sessionStart + 180s');
+  assert.equal(b2.open, 100.0, 'Bucket 2 open must be bar 4 open (100.0)');
+  assert.equal(b2.high, 101.5, 'Bucket 2 high must be max(101.5, 100.0, 98.5) = 101.5');
+  assert.equal(b2.low, 96.0, 'Bucket 2 low must be min(98.5, 97.0, 96.0) = 96.0');
+  assert.equal(b2.close, 98.0, 'Bucket 2 close must be last bar close (98.0)');
+  assert.equal(b2.volume, 4500, 'Bucket 2 volume must be sum(1200 + 800 + 2500) = 4500');
+
+  // 9.2 Gap handling: missing minute bar in bucket
+  const gapRaw = [
+    { time: sessionStart, open: 50.0, high: 52.0, low: 49.0, close: 51.0, volume: 500 },
+    // Missing minute at sessionStart + 60
+    { time: sessionStart + 120, open: 51.0, high: 53.0, low: 50.5, close: 52.5, volume: 700 },
+  ];
+  const gapResult = aggregateIntradayCandles(gapRaw, 3, sessionStart);
+  assert.equal(gapResult.length, 1, 'Gap bucket must aggregate gracefully');
+  assert.equal(gapResult[0].open, 50.0);
+  assert.equal(gapResult[0].high, 53.0);
+  assert.equal(gapResult[0].low, 49.0);
+  assert.equal(gapResult[0].close, 52.5);
+  assert.equal(gapResult[0].volume, 1200);
+
+  // 9.3 5-minute aggregation from 1m bars
+  const agg5m = aggregateIntradayCandles(raw1m, 5, sessionStart);
+  assert.equal(agg5m.length, 2, '6 1m bars across 5m boundary must produce 2 buckets (5 bars in first, 1 in second)');
+  assert.equal(agg5m[0].time, sessionStart);
+  assert.equal(agg5m[0].open, 100.0);
+  assert.equal(agg5m[0].high, 104.0);
+  assert.equal(agg5m[0].low, 97.0);
+  assert.equal(agg5m[0].close, 97.5);
+  assert.equal(agg5m[0].volume, 6500);
+}
+console.log('  ✅ Session-Aligned 1m -> 3m & 5m Candle Aggregation passed.');
+
+// =========================================================================
+// TEST 10: Exchange Timezone Resolution & Time Formatting
+// =========================================================================
+console.log('  Testing Exchange Timezone Resolution & Time Formatting...');
+{
+  // 10.1 Indian Equities (NSE)
+  const nseMeta = getExchangeTimezoneMeta('RELIANCE.NS');
+  assert.equal(nseMeta.timezone, 'IST');
+  assert.equal(nseMeta.exchangeTimezoneName, 'Asia/Kolkata');
+  assert.equal(nseMeta.gmtoffset, 19800);
+  assert.equal(nseMeta.marketName, 'NSE');
+  assert.equal(nseMeta.currency, 'INR');
+
+  // Format 03:45 UTC (09:15 IST)
+  const epochNSE = 1793072700;
+  const timeFormatted = formatExchangeLocalTime(epochNSE, nseMeta, 'tick');
+  assert.equal(timeFormatted, '09:15', '03:45 UTC must format to 09:15 in Asia/Kolkata');
+
+  const fullFormatted = formatExchangeLocalTime(epochNSE, nseMeta, 'time');
+  assert.ok(fullFormatted.includes('09:15') && fullFormatted.includes('IST'), `Must include 09:15 and IST, got ${fullFormatted}`);
+
+  // 10.2 US Equities (NASDAQ / NYSE)
+  const usMeta = getExchangeTimezoneMeta('AAPL');
+  assert.equal(usMeta.exchangeTimezoneName, 'America/New_York');
+  assert.equal(usMeta.currency, 'USD');
+
+  // Format 13:30 UTC (09:30 EDT)
+  const epochUS = 1793021400; // 2026-10-26T13:30:00.000Z
+  const usTick = formatExchangeLocalTime(epochUS, usMeta, 'tick');
+  assert.equal(usTick, '09:30', '13:30 UTC must format to 09:30 in America/New_York');
+}
+console.log('  ✅ Exchange Timezone Resolution & Time Formatting passed.');
+
+// =========================================================================
+// TEST 11: Zero Fabrication for Intraday Data
+// =========================================================================
+console.log('  Testing Zero Fabrication for Intraday Data...');
+{
+  // When fetching candles for a non-existent or blank symbol on intraday timeframe
+  const fakeSymbol = 'NONEXISTENT_STOCK_999.NS';
+  const intradayRes = await getStockHistoricalCandles(fakeSymbol, '1m');
+
+  assert.equal(intradayRes.isUnavailable, true, 'Intraday fetch must return isUnavailable: true');
+  assert.equal(intradayRes.candles.length, 0, 'No synthetic candles may be fabricated for intraday');
+  assert.ok(intradayRes.reason.includes('unavailable'), 'Reason must explicitly state data is unavailable');
+}
+console.log('  ✅ Zero Fabrication for Intraday Data passed.');
+
+console.log('\n🎉 ALL SMOKE TESTS PASSED SUCCESSFULLY! (11/11 test suites)');

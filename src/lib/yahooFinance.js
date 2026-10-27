@@ -1,6 +1,12 @@
 import { synthesizeCandlesticks } from './microstructureEngine.js';
 import { saveCandlesCache, getCandlesCache } from './localDb.js';
 import { recordCloudflareCall, coalesceAsync } from './cloudQuotaManager.js';
+import { 
+  validateCandle, 
+  aggregateIntradayCandles, 
+  getExchangeTimezoneMeta, 
+  harmonizeSessionBounds 
+} from './intradayAggregator.js';
 
 /**
  * High-Speed Financial Market Engine (0ms Instant Load + Real-Time Ticks)
@@ -876,195 +882,221 @@ export async function getStockHistoricalCandles(symbol, timeframe = '1D') {
   const isDev = typeof window !== 'undefined' && 
     (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
 
-  let interval = '5m';
-  let range = '1d';
-  if (tf === '1m') { interval = '1m'; range = '1d'; }
-  else if (tf === '3m') { interval = '1m'; range = '1d'; }
-  else if (tf === '5m' || tf === '1D') { interval = '5m'; range = '1d'; }
-  else if (tf === '1W') { interval = '15m'; range = '5d'; }
-  else if (tf === '1M') { interval = '1d'; range = '1mo'; }
-  else if (tf === '3M') { interval = '1d'; range = '3mo'; }
-  else if (tf === '1Y') { interval = '1d'; range = '1y'; }
+  const isIntradayInterval = ['1m', '3m', '5m'].includes(tf);
+  const defaultTzMeta = getExchangeTimezoneMeta(upper);
 
-  const queryPath = `/v8/finance/chart/${encodeURIComponent(targetSymbol)}?interval=${interval}&range=${range}`;
-  const candidateEndpoints = isDev
-    ? [`/api/yahoo${queryPath}`, `${CLOUDFLARE_YAHOO_PROXY}${queryPath}`]
-    : [`${CLOUDFLARE_YAHOO_PROXY}${queryPath}`];
+  // Candidate query plan based on selected timeframe
+  let candidatePlans = [];
+  if (tf === '1m') {
+    candidatePlans = [{ interval: '1m', range: '1d', aggregateTo: 1 }];
+  } else if (tf === '3m') {
+    // Yahoo does not support interval=3m natively; fetch 1m and aggregate to 3m with session alignment
+    candidatePlans = [{ interval: '1m', range: '1d', aggregateTo: 3 }];
+  } else if (tf === '5m') {
+    // Prefer native 5m; fall back to aggregating 1m into 5m
+    candidatePlans = [
+      { interval: '5m', range: '1d', aggregateTo: 0 },
+      { interval: '1m', range: '1d', aggregateTo: 5 },
+    ];
+  } else if (tf === '1D') {
+    candidatePlans = [{ interval: '5m', range: '1d', aggregateTo: 0 }];
+  } else if (tf === '1W') {
+    candidatePlans = [{ interval: '15m', range: '5d', aggregateTo: 0 }];
+  } else if (tf === '1M') {
+    candidatePlans = [{ interval: '1d', range: '1mo', aggregateTo: 0 }];
+  } else if (tf === '3M') {
+    candidatePlans = [{ interval: '1d', range: '3mo', aggregateTo: 0 }];
+  } else if (tf === '1Y') {
+    candidatePlans = [{ interval: '1d', range: '1y', aggregateTo: 0 }];
+  }
 
-  for (const endpoint of candidateEndpoints) {
-    try {
-      recordCloudflareCall(endpoint, false);
-      const res = await fetch(endpoint);
-      const contentType = res.headers.get('content-type') || '';
-      if (res.ok && contentType.includes('application/json')) {
-        const data = await res.json();
-        const result = data?.chart?.result?.[0];
-        if (result && result.timestamp && result.indicators?.quote?.[0]) {
-          const meta = result.meta || {};
-          const timestamps = result.timestamp;
-          const quotes = result.indicators.quote[0];
-          const previousClose = meta.chartPreviousClose || meta.previousClose || meta.regularMarketPrice;
-          let candles = [];
-          const isIntraday = ['1m', '3m', '5m', '1D', '1W'].includes(tf);
+  for (const plan of candidatePlans) {
+    const queryPath = `/v8/finance/chart/${encodeURIComponent(targetSymbol)}?interval=${plan.interval}&range=${plan.range}`;
+    const candidateEndpoints = isDev
+      ? [`/api/yahoo${queryPath}`, `${CLOUDFLARE_YAHOO_PROXY}${queryPath}`]
+      : [`${CLOUDFLARE_YAHOO_PROXY}${queryPath}`];
 
-          for (let i = 0; i < timestamps.length; i++) {
-            const open = quotes.open[i];
-            const high = quotes.high[i];
-            const low = quotes.low[i];
-            const close = quotes.close[i];
-            const vol = quotes.volume ? quotes.volume[i] || 0 : 0;
-            if (open == null || close == null || high == null || low == null) continue;
+    for (const endpoint of candidateEndpoints) {
+      try {
+        recordCloudflareCall(endpoint, false);
+        const res = await fetch(endpoint);
+        const contentType = res.headers.get('content-type') || '';
+        if (res.ok && contentType.includes('application/json')) {
+          const data = await res.json();
+          const result = data?.chart?.result?.[0];
+          if (result && result.timestamp && result.indicators?.quote?.[0]) {
+            const meta = result.meta || {};
+            const timestamps = result.timestamp;
+            const quotes = result.indicators.quote[0];
+            const sessionStart = meta.currentTradingPeriod?.regular?.start;
+            const sessionEnd = meta.currentTradingPeriod?.regular?.end;
+            const tzMeta = getExchangeTimezoneMeta(upper, meta);
 
-            const timeValue = isIntraday 
-              ? timestamps[i] 
-              : new Date(timestamps[i] * 1000).toISOString().split('T')[0];
+            const isIntraday = ['1m', '3m', '5m', '1D', '1W'].includes(tf);
+            const rawBars = [];
 
-            candles.push({
-              time: timeValue,
-              open: Number(open.toFixed(2)),
-              high: Number(high.toFixed(2)),
-              low: Number(low.toFixed(2)),
-              close: Number(close.toFixed(2)),
-              volume: vol,
-            });
-          }
+            for (let i = 0; i < timestamps.length; i++) {
+              const open = quotes.open[i];
+              const high = quotes.high[i];
+              const low = quotes.low[i];
+              const close = quotes.close[i];
+              const vol = quotes.volume ? quotes.volume[i] || 0 : 0;
+              if (open == null || close == null || high == null || low == null) continue;
 
-          if (tf === '3m' && candles.length > 0) {
-            // Group 1-minute bars into 3-minute buckets (180s epoch)
-            const buckets = new Map();
-            for (const c of candles) {
-              const bucketKey = Math.floor(c.time / 180) * 180;
-              if (!buckets.has(bucketKey)) {
-                buckets.set(bucketKey, []);
-              }
-              buckets.get(bucketKey).push(c);
-            }
-            const aggregated = [];
-            for (const [bTime, bars] of buckets.entries()) {
-              if (!bars || bars.length === 0) continue;
-              const bOpen = bars[0].open;
-              const bClose = bars[bars.length - 1].close;
-              let bHigh = bars[0].high;
-              let bLow = bars[0].low;
-              let bVol = 0;
-              for (const b of bars) {
-                if (b.high > bHigh) bHigh = b.high;
-                if (b.low < bLow) bLow = b.low;
-                bVol += (b.volume || 0);
-              }
-              aggregated.push({
-                time: bTime,
-                open: bOpen,
-                high: Number(bHigh.toFixed(2)),
-                low: Number(bLow.toFixed(2)),
-                close: bClose,
-                volume: bVol,
+              const timeValue = isIntraday 
+                ? timestamps[i] 
+                : new Date(timestamps[i] * 1000).toISOString().split('T')[0];
+
+              const { isValid, candle } = validateCandle({
+                time: timeValue,
+                open,
+                high,
+                low,
+                close,
+                volume: vol,
               });
-            }
-            candles = aggregated;
-          }
 
-          const minBars = ['1m', '3m', '5m'].includes(tf) ? 5 : 10;
-          if (candles.length >= minBars) {
-            const rawCurrentPrice = Number((meta.regularMarketPrice || candles[candles.length - 1].close).toFixed(2));
-            const maxCandleHigh = Math.max(...candles.map((c) => c.high));
-            const minCandleLow = Math.min(...candles.map((c) => c.low));
-            const prevClose = Number((previousClose || candles[0].open).toFixed(2));
-
-            // Strictly harmonize session bounds with the candles and current quote
-            const resolvedDayHigh = Number(Math.max(meta.regularMarketDayHigh || 0, maxCandleHigh, rawCurrentPrice).toFixed(2));
-            const resolvedDayLow = Number(Math.min(meta.regularMarketDayLow || Infinity, minCandleLow, rawCurrentPrice).toFixed(2));
-
-            // Ensure no candle violates session boundaries
-            for (const c of candles) {
-              if (c.high > resolvedDayHigh) c.high = resolvedDayHigh;
-              if (c.low < resolvedDayLow) c.low = resolvedDayLow;
-              if (c.close > resolvedDayHigh) c.close = resolvedDayHigh;
-              if (c.close < resolvedDayLow) c.close = resolvedDayLow;
-              if (c.open > resolvedDayHigh) c.open = resolvedDayHigh;
-              if (c.open < resolvedDayLow) c.open = resolvedDayLow;
-            }
-
-            // Append or update active ongoing bar for current minute
-            if (isIntraday && candles.length > 0) {
-              const stepSec = tf === '1m' ? 60 : (tf === '3m' ? 180 : 300);
-              const currentBucketTime = Math.floor(Date.now() / 1000 / stepSec) * stepSec;
-              const lastBar = candles[candles.length - 1];
-
-              if (typeof lastBar.time === 'number' && currentBucketTime > lastBar.time) {
-                candles.push({
-                  time: currentBucketTime,
-                  open: lastBar.close,
-                  high: Math.max(lastBar.close, rawCurrentPrice),
-                  low: Math.min(lastBar.close, rawCurrentPrice),
-                  close: rawCurrentPrice,
-                  volume: 100,
-                });
-              } else {
-                lastBar.close = rawCurrentPrice;
-                lastBar.high = Math.max(lastBar.high, rawCurrentPrice);
-                lastBar.low = Math.min(lastBar.low, rawCurrentPrice);
+              if (isValid && candle) {
+                rawBars.push(candle);
               }
             }
 
-            const change = Number((rawCurrentPrice - prevClose).toFixed(2));
-            const changePercent = Number((((rawCurrentPrice - prevClose) / (prevClose || 1)) * 100).toFixed(2));
-            const quoteTimestamp = meta.regularMarketTime ? meta.regularMarketTime * 1000 : Date.now();
+            let candles = rawBars;
 
-            const normalizedQuote = {
-              symbol: upper,
-              ticker: STOCK_DIRECTORY[upper]?.ticker || upper.replace('.NS', ''),
-              name: meta.shortName || meta.longName || STOCK_DIRECTORY[upper]?.name || upper,
-              price: rawCurrentPrice,
-              high: resolvedDayHigh,
-              low: resolvedDayLow,
-              open: Number((candles[0]?.open || rawCurrentPrice).toFixed(2)),
-              previousClose: prevClose,
-              change,
-              changePercent,
-              volume: meta.regularMarketVolume 
-                ? (meta.regularMarketVolume > 1000000 
-                    ? `${(meta.regularMarketVolume / 1000000).toFixed(1)}M` 
-                    : String(meta.regularMarketVolume))
-                : (STOCK_DIRECTORY[upper]?.volume || '2.5M'),
-              rawVolume: meta.regularMarketVolume || 2500000,
-              timestamp: quoteTimestamp,
-              source: 'exchange_normalized_proxy',
-            };
-
-            // Store in central runtime store
-            runtimePriceStore.set(upper, normalizedQuote);
-            if (targetSymbol !== upper) {
-              runtimePriceStore.set(targetSymbol, normalizedQuote);
+            // Session-aligned aggregation if required
+            if (plan.aggregateTo > 1 && isIntraday && rawBars.length > 0) {
+              candles = aggregateIntradayCandles(rawBars, plan.aggregateTo, sessionStart, sessionEnd);
             }
 
-            const finalRes = {
-              candles,
-              meta,
-              previousClose: prevClose,
-              dayHigh: resolvedDayHigh,
-              dayLow: resolvedDayLow,
-              currentPrice: rawCurrentPrice,
-              change,
-              changePercent,
-              isIntraday,
-              timestamp: quoteTimestamp,
-              quote: normalizedQuote,
-            };
-            saveCandlesCache(upper, tf, finalRes);
-            if (targetSymbol !== upper) {
-              saveCandlesCache(targetSymbol, tf, finalRes);
+            const minBars = isIntradayInterval ? 3 : 10;
+            if (candles.length >= minBars) {
+              const rawCurrentPrice = Number((meta.regularMarketPrice || candles[candles.length - 1].close).toFixed(2));
+              const prevClose = Number((meta.chartPreviousClose || meta.previousClose || candles[0].open).toFixed(2));
+
+              // Harmonize session bounds strictly with actual candles and exchange quote
+              const sessionBounds = harmonizeSessionBounds(
+                candles, 
+                rawCurrentPrice, 
+                meta.regularMarketDayHigh, 
+                meta.regularMarketDayLow
+              );
+
+              // Check if market session is currently active
+              const nowSec = Math.floor(Date.now() / 1000);
+              const isMarketOpen = sessionStart && sessionEnd
+                ? (nowSec >= sessionStart && nowSec <= sessionEnd)
+                : true;
+
+              // Handle active ongoing bar only during regular open trading hours
+              if (isIntraday && isMarketOpen && candles.length > 0) {
+                const stepSec = tf === '1m' ? 60 : (tf === '3m' ? 180 : 300);
+                const currentBucketTime = sessionStart
+                  ? sessionStart + Math.floor((nowSec - sessionStart) / stepSec) * stepSec
+                  : Math.floor(nowSec / stepSec) * stepSec;
+
+                const lastBar = candles[candles.length - 1];
+
+                if (typeof lastBar.time === 'number') {
+                  if (lastBar.time === currentBucketTime) {
+                    lastBar.close = rawCurrentPrice;
+                    lastBar.high = Math.max(lastBar.high, rawCurrentPrice);
+                    lastBar.low = Math.min(lastBar.low, rawCurrentPrice);
+                  } else if (currentBucketTime > lastBar.time && (!sessionEnd || currentBucketTime <= sessionEnd)) {
+                    candles.push({
+                      time: currentBucketTime,
+                      open: lastBar.close,
+                      high: Math.max(lastBar.close, rawCurrentPrice),
+                      low: Math.min(lastBar.close, rawCurrentPrice),
+                      close: rawCurrentPrice,
+                      volume: 0,
+                    });
+                  }
+                }
+              }
+
+              const change = Number((rawCurrentPrice - prevClose).toFixed(2));
+              const changePercent = Number((((rawCurrentPrice - prevClose) / (prevClose || 1)) * 100).toFixed(2));
+              const quoteTimestamp = meta.regularMarketTime ? meta.regularMarketTime * 1000 : Date.now();
+
+              const normalizedQuote = {
+                symbol: upper,
+                ticker: STOCK_DIRECTORY[upper]?.ticker || upper.replace('.NS', ''),
+                name: meta.shortName || meta.longName || STOCK_DIRECTORY[upper]?.name || upper,
+                price: rawCurrentPrice,
+                high: sessionBounds.dayHigh,
+                low: sessionBounds.dayLow,
+                open: Number((candles[0]?.open || rawCurrentPrice).toFixed(2)),
+                previousClose: prevClose,
+                change,
+                changePercent,
+                volume: meta.regularMarketVolume 
+                  ? (meta.regularMarketVolume > 1000000 
+                      ? `${(meta.regularMarketVolume / 1000000).toFixed(1)}M` 
+                      : String(meta.regularMarketVolume))
+                  : (STOCK_DIRECTORY[upper]?.volume || '2.5M'),
+                rawVolume: meta.regularMarketVolume || 2500000,
+                timestamp: quoteTimestamp,
+                source: 'exchange_normalized_proxy',
+              };
+
+              // Store in central runtime store
+              runtimePriceStore.set(upper, normalizedQuote);
+              if (targetSymbol !== upper) {
+                runtimePriceStore.set(targetSymbol, normalizedQuote);
+              }
+
+              const finalRes = {
+                candles,
+                meta,
+                timezone: tzMeta,
+                previousClose: prevClose,
+                dayHigh: sessionBounds.dayHigh,
+                dayLow: sessionBounds.dayLow,
+                currentPrice: rawCurrentPrice,
+                lastCompletedClose: candles[candles.length - 1]?.close,
+                lastBarTime: candles[candles.length - 1]?.time,
+                isMarketClosed: !isMarketOpen,
+                change,
+                changePercent,
+                isIntraday,
+                timeframe: tf,
+                timestamp: quoteTimestamp,
+                quote: normalizedQuote,
+              };
+
+              saveCandlesCache(upper, tf, finalRes);
+              if (targetSymbol !== upper) {
+                saveCandlesCache(targetSymbol, tf, finalRes);
+              }
+              return finalRes;
             }
-            return finalRes;
           }
         }
+      } catch (err) {
+        // Continue to next endpoint or plan
       }
-    } catch (err) {
-      // Continue to next candidate or fallback
     }
   }
 
-  // 3. Client-Side Deterministic Microstructure Synthesis (100% zero server cost, zero backend)
+  // 3. ZERO FABRICATION FOR INTRADAY
+  // If provider cannot supply valid intraday data, return clean unavailable state
+  if (isIntradayInterval) {
+    return {
+      candles: [],
+      isUnavailable: true,
+      symbol: upper,
+      timeframe: tf,
+      reason: 'Intraday exchange data unavailable for this symbol',
+      timezone: defaultTzMeta,
+      currentPrice: metrics?.price || 100,
+      previousClose: metrics?.previousClose || metrics?.price || 100,
+      dayHigh: metrics?.high || metrics?.price || 100,
+      dayLow: metrics?.low || metrics?.price || 100,
+      quote: metrics,
+    };
+  }
+
+  // 4. Macro overview fallback (1D / 1W / 1M / 1Y only)
   const result = synthesizeCandlesticks(upper, metrics, tf);
   saveCandlesCache(upper, tf, result);
   return result;
