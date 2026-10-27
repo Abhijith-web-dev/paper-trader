@@ -75,6 +75,7 @@ export default function StockChart({
 
   // Chart Configuration State
   const [timeframe, setTimeframe] = useState('1D'); // '1m' | '3m' | '5m' | '1D' | '1W' | '1M' | '3M' | '1Y'
+  const isIntraday = ['1m', '3m', '5m', '1D', '1W'].includes(timeframe);
   const [chartType, setChartType] = useState('candles'); // 'candles' | 'area'
   const [candles, setCandles] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -187,7 +188,6 @@ export default function StockChart({
         const data = await getStockHistoricalCandles(symbol, timeframe);
         if (isMounted) {
           const rawCandles = Array.isArray(data) ? data : data?.candles || [];
-          const isTfIntraday = ['1m', '3m', '5m', '1D', '1W'].includes(timeframe);
           
           // Ensure candles are sorted strictly by ascending time with no duplicates
           const seenTimes = new Set();
@@ -232,7 +232,7 @@ export default function StockChart({
             }
 
             // Invariant: last candle close strictly matches normalized current price
-            if (isTfIntraday && validCandles.length > 0) {
+            if (isIntraday && validCandles.length > 0) {
               const last = validCandles[validCandles.length - 1];
               last.close = synQuote.price;
               last.high = Math.max(last.high, synQuote.price);
@@ -254,7 +254,7 @@ export default function StockChart({
     return () => {
       isMounted = false;
     };
-  }, [symbol, timeframe, onQuoteSync]);
+  }, [symbol, timeframe, isIntraday, onQuoteSync]);
 
   // 2. Subscribe to real-time price stream from OmniFeed
   useEffect(() => {
@@ -321,7 +321,6 @@ export default function StockChart({
     }
 
     const container = chartContainerRef.current;
-    const isIntraday = ['1m', '3m', '5m', '1D', '1W'].includes(timeframe);
     const computedHeight = isFullscreen
       ? (container.clientHeight || Math.max(480, window.innerHeight - 150))
       : 480;
@@ -545,7 +544,7 @@ export default function StockChart({
         chartInstanceRef.current = null;
       }
     };
-  }, [candles, chartType, activeIndicators, timeframe, isFullscreen]);
+  }, [candles, chartType, activeIndicators, timeframe, isIntraday, isFullscreen]);
 
   // Dynamic resize and fit when fullscreen mode toggles
   useEffect(() => {
