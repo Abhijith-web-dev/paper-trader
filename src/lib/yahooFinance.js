@@ -850,7 +850,7 @@ export async function getStockHistoricalCandles(symbol, timeframe = '1D') {
     const cached = await getCandlesCache(upper, tf);
     if (cached && (Array.isArray(cached) ? cached.length > 0 : cached?.candles?.length > 0)) {
       const isIntraday = ['1m', '3m', '5m', '1D', '1W'].includes(tf);
-      const maxAgeMs = tf === '1m' ? 60 * 1000 : (tf === '3m' ? 2 * 60 * 1000 : (isIntraday ? 5 * 60 * 1000 : 4 * 60 * 60 * 1000));
+      const maxAgeMs = tf === '1m' ? 30 * 1000 : (tf === '3m' ? 60 * 1000 : (isIntraday ? 120 * 1000 : 4 * 60 * 60 * 1000));
       const cachedTime = cached.timestamp || cached.updatedAt || 0;
       if (Date.now() - cachedTime < maxAgeMs) {
         return cached;
@@ -966,15 +966,90 @@ export async function getStockHistoricalCandles(symbol, timeframe = '1D') {
 
           const minBars = ['1m', '3m', '5m'].includes(tf) ? 5 : 10;
           if (candles.length >= minBars) {
+            const rawCurrentPrice = Number((meta.regularMarketPrice || candles[candles.length - 1].close).toFixed(2));
+            const maxCandleHigh = Math.max(...candles.map((c) => c.high));
+            const minCandleLow = Math.min(...candles.map((c) => c.low));
+            const prevClose = Number((previousClose || candles[0].open).toFixed(2));
+
+            // Strictly harmonize session bounds with the candles and current quote
+            const resolvedDayHigh = Number(Math.max(meta.regularMarketDayHigh || 0, maxCandleHigh, rawCurrentPrice).toFixed(2));
+            const resolvedDayLow = Number(Math.min(meta.regularMarketDayLow || Infinity, minCandleLow, rawCurrentPrice).toFixed(2));
+
+            // Ensure no candle violates session boundaries
+            for (const c of candles) {
+              if (c.high > resolvedDayHigh) c.high = resolvedDayHigh;
+              if (c.low < resolvedDayLow) c.low = resolvedDayLow;
+              if (c.close > resolvedDayHigh) c.close = resolvedDayHigh;
+              if (c.close < resolvedDayLow) c.close = resolvedDayLow;
+              if (c.open > resolvedDayHigh) c.open = resolvedDayHigh;
+              if (c.open < resolvedDayLow) c.open = resolvedDayLow;
+            }
+
+            // Append or update active ongoing bar for current minute
+            if (isIntraday && candles.length > 0) {
+              const stepSec = tf === '1m' ? 60 : (tf === '3m' ? 180 : 300);
+              const currentBucketTime = Math.floor(Date.now() / 1000 / stepSec) * stepSec;
+              const lastBar = candles[candles.length - 1];
+
+              if (typeof lastBar.time === 'number' && currentBucketTime > lastBar.time) {
+                candles.push({
+                  time: currentBucketTime,
+                  open: lastBar.close,
+                  high: Math.max(lastBar.close, rawCurrentPrice),
+                  low: Math.min(lastBar.close, rawCurrentPrice),
+                  close: rawCurrentPrice,
+                  volume: 100,
+                });
+              } else {
+                lastBar.close = rawCurrentPrice;
+                lastBar.high = Math.max(lastBar.high, rawCurrentPrice);
+                lastBar.low = Math.min(lastBar.low, rawCurrentPrice);
+              }
+            }
+
+            const change = Number((rawCurrentPrice - prevClose).toFixed(2));
+            const changePercent = Number((((rawCurrentPrice - prevClose) / (prevClose || 1)) * 100).toFixed(2));
+            const quoteTimestamp = meta.regularMarketTime ? meta.regularMarketTime * 1000 : Date.now();
+
+            const normalizedQuote = {
+              symbol: upper,
+              ticker: STOCK_DIRECTORY[upper]?.ticker || upper.replace('.NS', ''),
+              name: meta.shortName || meta.longName || STOCK_DIRECTORY[upper]?.name || upper,
+              price: rawCurrentPrice,
+              high: resolvedDayHigh,
+              low: resolvedDayLow,
+              open: Number((candles[0]?.open || rawCurrentPrice).toFixed(2)),
+              previousClose: prevClose,
+              change,
+              changePercent,
+              volume: meta.regularMarketVolume 
+                ? (meta.regularMarketVolume > 1000000 
+                    ? `${(meta.regularMarketVolume / 1000000).toFixed(1)}M` 
+                    : String(meta.regularMarketVolume))
+                : (STOCK_DIRECTORY[upper]?.volume || '2.5M'),
+              rawVolume: meta.regularMarketVolume || 2500000,
+              timestamp: quoteTimestamp,
+              source: 'exchange_normalized_proxy',
+            };
+
+            // Store in central runtime store
+            runtimePriceStore.set(upper, normalizedQuote);
+            if (targetSymbol !== upper) {
+              runtimePriceStore.set(targetSymbol, normalizedQuote);
+            }
+
             const finalRes = {
               candles,
               meta,
-              previousClose: Number((previousClose || candles[0].open).toFixed(2)),
-              dayHigh: meta.regularMarketDayHigh || Math.max(...candles.map((c) => c.high)),
-              dayLow: meta.regularMarketDayLow || Math.min(...candles.map((c) => c.low)),
-              currentPrice: meta.regularMarketPrice || candles[candles.length - 1].close,
+              previousClose: prevClose,
+              dayHigh: resolvedDayHigh,
+              dayLow: resolvedDayLow,
+              currentPrice: rawCurrentPrice,
+              change,
+              changePercent,
               isIntraday,
-              timestamp: Date.now(),
+              timestamp: quoteTimestamp,
+              quote: normalizedQuote,
             };
             saveCandlesCache(upper, tf, finalRes);
             if (targetSymbol !== upper) {

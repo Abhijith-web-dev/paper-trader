@@ -122,6 +122,13 @@ function broadcast(updates, engineName) {
 }
 
 /**
+ * Public export to broadcast verified quote updates from chart or proxy to all subscribers
+ */
+export function broadcastQuoteUpdates(updates, engineName = 'Normalized Exchange Stream') {
+  broadcast(updates, engineName);
+}
+
+/**
  * Central Batch-Sync from TradingView Scanner API
  * Coalesces concurrent calls into a single network operation
  */

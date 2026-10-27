@@ -11,6 +11,7 @@ import {
 } from 'lightweight-charts';
 import { getStockHistoricalCandles, getStockQuote, STOCK_DIRECTORY } from '../lib/yahooFinance';
 import { subscribeToMarketStream } from '../lib/omniFeed';
+import { getQuoteFreshness } from '../lib/quoteFreshness';
 import { calculateSMA, calculateEMA, calculateBollingerBands } from '../lib/indicators';
 import { 
   BarChart3, 
@@ -25,18 +26,21 @@ import {
   Layers,
   Activity,
   Maximize2,
-  Minimize2
+  Minimize2,
+  Clock
 } from 'lucide-react';
 
 /**
  * Format timestamp or date string for HUD
  */
-function formatHudTime(rawTime) {
+function formatHudTime(rawTime, isIntraday = true) {
   if (!rawTime) return '';
   if (typeof rawTime === 'number') {
     const d = new Date(rawTime * 1000);
     if (isNaN(d.getTime())) return '';
-    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' ' + d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+    const timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+    const dateStr = d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+    return isIntraday ? `${timeStr} IST (${dateStr})` : dateStr;
   }
   return String(rawTime);
 }
@@ -51,7 +55,8 @@ export default function StockChart({
   currencySymbol = '₹', 
   livePrice,
   activeIndicators: parentIndicators,
-  onToggleIndicator: parentOnToggle
+  onToggleIndicator: parentOnToggle,
+  onQuoteSync = null,
 }) {
   const chartWrapperRef = useRef(null);
   const chartContainerRef = useRef(null);
@@ -182,6 +187,7 @@ export default function StockChart({
         const data = await getStockHistoricalCandles(symbol, timeframe);
         if (isMounted) {
           const rawCandles = Array.isArray(data) ? data : data?.candles || [];
+          const isTfIntraday = ['1m', '3m', '5m', '1D', '1W'].includes(timeframe);
           
           // Ensure candles are sorted strictly by ascending time with no duplicates
           const seenTimes = new Set();
@@ -207,6 +213,33 @@ export default function StockChart({
             return String(a.time).localeCompare(String(b.time));
           });
 
+          // Sync normalized quote to parent (StockDetailPage / StockDetailsPanel)
+          if (data && (data.quote || data.currentPrice)) {
+            const synQuote = data.quote || {
+              symbol,
+              price: data.currentPrice,
+              high: data.dayHigh,
+              low: data.dayLow,
+              previousClose: data.previousClose,
+              change: data.change ?? (data.currentPrice - data.previousClose),
+              changePercent: data.changePercent ?? (((data.currentPrice - data.previousClose) / (data.previousClose || 1)) * 100),
+              timestamp: data.timestamp || Date.now(),
+              source: 'normalized_exchange_feed',
+            };
+            setQuoteData(synQuote);
+            if (onQuoteSync) {
+              onQuoteSync(synQuote);
+            }
+
+            // Invariant: last candle close strictly matches normalized current price
+            if (isTfIntraday && validCandles.length > 0) {
+              const last = validCandles[validCandles.length - 1];
+              last.close = synQuote.price;
+              last.high = Math.max(last.high, synQuote.price);
+              last.low = Math.min(last.low, synQuote.price);
+            }
+          }
+
           setCandles(validCandles);
           setLoading(false);
         }
@@ -221,26 +254,41 @@ export default function StockChart({
     return () => {
       isMounted = false;
     };
-  }, [symbol, timeframe]);
+  }, [symbol, timeframe, onQuoteSync]);
 
   // 2. Subscribe to real-time price stream from OmniFeed
   useEffect(() => {
     const unsubscribe = subscribeToMarketStream(({ prices }) => {
       const live = prices[symbol];
       if (live && live.price) {
-        setQuoteData((prev) => ({ ...prev, ...live }));
+        const newPrice = Number(live.price);
+        setQuoteData((prev) => {
+          const updatedHigh = Math.max(prev?.high || newPrice, newPrice);
+          const updatedLow = Math.min(prev?.low || newPrice, newPrice);
+          const updated = {
+            ...prev,
+            ...live,
+            price: newPrice,
+            high: updatedHigh,
+            low: updatedLow,
+            timestamp: live.timestamp || Date.now(),
+          };
+          if (onQuoteSync) {
+            onQuoteSync(updated);
+          }
+          return updated;
+        });
 
         // Dynamically update latest candle on the chart without stale closure
         const currentCandles = candlesRef.current;
         if (candleSeriesRef.current && currentCandles.length > 0) {
           const last = currentCandles[currentCandles.length - 1];
-          const newClose = Number(live.price);
           const updatedLast = {
             time: last.time,
             open: last.open,
-            high: Math.max(last.high, newClose),
-            low: Math.min(last.low, newClose),
-            close: newClose,
+            high: Math.max(last.high, newPrice),
+            low: Math.min(last.low, newPrice),
+            close: newPrice,
             volume: last.volume || 1000,
           };
 
@@ -248,7 +296,7 @@ export default function StockChart({
             if (chartType === 'candles' && candleSeriesRef.current) {
               candleSeriesRef.current.update(updatedLast);
             } else if (chartType === 'area' && areaSeriesRef.current) {
-              areaSeriesRef.current.update({ time: last.time, value: newClose });
+              areaSeriesRef.current.update({ time: last.time, value: newPrice });
             }
           } catch {
             // Safe fallback if series was disposed
@@ -258,7 +306,7 @@ export default function StockChart({
     });
 
     return () => unsubscribe();
-  }, [symbol, chartType]);
+  }, [symbol, chartType, onQuoteSync]);
 
   // 3. Initialize & Build Lightweight Charts Canvas Instance
   useEffect(() => {
@@ -561,6 +609,11 @@ export default function StockChart({
   // Active HUD Values: Hovered candle data or latest quote snapshot
   const activeHud = hoveredData || (candles.length > 0 ? candles[candles.length - 1] : null);
 
+  // Quote freshness telemetry
+  const quoteFreshness = useMemo(() => {
+    return getQuoteFreshness(quoteData || { price: currentPrice, timestamp: Date.now() });
+  }, [quoteData, currentPrice]);
+
   return (
     <div 
       ref={chartWrapperRef}
@@ -606,10 +659,10 @@ export default function StockChart({
 
         {/* Real-Time Status Pill & Fullscreen Toggle Button */}
         <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1.5 bg-emerald-50 border border-emerald-300 text-emerald-800 text-[10px] font-bold px-2 py-1 uppercase tracking-wider">
-            <Radio className="w-3 h-3 text-emerald-600 animate-pulse" />
-            <span className="hidden sm:inline">Real-Time Engine • 0ms Native Feed</span>
-            <span className="sm:hidden">LIVE FEED</span>
+          <div className={`flex items-center gap-1.5 border text-[10px] font-bold px-2 py-1 uppercase tracking-wider ${quoteFreshness.badgeClass}`}>
+            <Radio className={`w-3 h-3 ${quoteFreshness.isStale ? 'text-amber-600' : 'text-emerald-600 animate-pulse'}`} />
+            <span className="hidden sm:inline">{quoteFreshness.label} • AS OF {quoteFreshness.asOf}</span>
+            <span className="sm:hidden">{quoteFreshness.label}</span>
           </div>
 
           {/* Fullscreen Mode Toggle Button */}
@@ -774,11 +827,13 @@ export default function StockChart({
       </div>
 
       {/* 3. Live Crosshair Dynamic Metrics HUD Bar */}
-      <div className="px-3 py-1 bg-[#FAF8F3] border-b border-stone-200 flex flex-wrap items-center justify-between text-[11px] font-mono text-stone-600 shrink-0">
+      <div className="px-3 py-1.5 bg-[#FAF8F3] border-b border-stone-200 flex flex-wrap items-center justify-between text-[11px] font-mono text-stone-600 shrink-0 gap-2">
         {activeHud ? (
-          <div className="flex items-center gap-3 sm:gap-4 flex-wrap">
-            <span className="text-stone-400">
-              TIME: <strong className="text-stone-800">{formatHudTime(activeHud.time)}</strong>
+          <div className="flex items-center gap-2.5 sm:gap-4 flex-wrap">
+            <span className="text-stone-500 flex items-center gap-1">
+              <Clock className="w-3 h-3 text-stone-500 shrink-0" />
+              <span>BAR:</span>
+              <strong className="text-stone-900">{formatHudTime(activeHud.time, isIntraday)}</strong>
             </span>
             <span>
               O: <strong className="text-stone-900">{currencySymbol}{Number(activeHud.open ?? activeHud.close).toFixed(2)}</strong>
@@ -797,6 +852,10 @@ export default function StockChart({
                 VOL: <strong className="text-stone-800">{new Intl.NumberFormat('en-US', { notation: 'compact' }).format(activeHud.volume)}</strong>
               </span>
             )}
+            <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 text-[9px] uppercase font-bold tracking-wider border ${quoteFreshness.badgeClass}`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${quoteFreshness.isStale ? 'bg-amber-500' : 'bg-emerald-600 animate-pulse'}`} />
+              <span>{quoteFreshness.label} ({quoteFreshness.asOf})</span>
+            </span>
           </div>
         ) : (
           <div>Hover over chart to inspect candle coordinates</div>
@@ -806,8 +865,8 @@ export default function StockChart({
         </div>
       </div>
 
-      {/* 4. Canvas Chart Viewport (Fullscreen Flexible Height) */}
-      <div className={`w-full relative bg-white ${isFullscreen ? 'flex-1 min-h-0 h-full' : 'min-h-[460px]'}`}>
+      {/* 4. Canvas Chart Viewport (Responsive & Fullscreen Flexible Height) */}
+      <div className={`w-full relative bg-white ${isFullscreen ? 'flex-1 min-h-0 h-full' : 'min-h-[380px] sm:min-h-[460px]'}`}>
         {loading && (
           <div className="absolute inset-0 bg-white/75 backdrop-blur-[1px] flex flex-col items-center justify-center z-10">
             <div className="w-6 h-6 border-2 border-[#111111] border-t-transparent rounded-full animate-spin mb-2" />
@@ -816,7 +875,7 @@ export default function StockChart({
         )}
         <div 
           ref={chartContainerRef} 
-          className={`w-full ${isFullscreen ? 'h-full' : 'h-[460px]'}`} 
+          className={`w-full ${isFullscreen ? 'h-full' : 'h-[380px] sm:h-[460px]'}`} 
         />
       </div>
 

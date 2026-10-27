@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTradingTools } from '../context/TradingToolsContext';
 import { STOCK_DIRECTORY, getStockQuote, getOrderBook, fetchSingleYahooQuote } from '../lib/yahooFinance';
 import { subscribeToMarketStream } from '../lib/omniFeed';
 import { browserMarketServer } from '../lib/browserMarketServer';
+import { getQuoteFreshness } from '../lib/quoteFreshness';
 import { isMarketOpenForSymbol } from '../lib/marketHours';
 import MarketStatusBadge from '../components/MarketStatusBadge';
 import StockChart from '../components/StockChart';
@@ -46,20 +47,22 @@ export default function StockDetailPage() {
   } = useTradingTools();
 
   const symbol = decodeURIComponent(rawSymbol || 'AAPL').toUpperCase();
-  const stockInfo = STOCK_DIRECTORY[symbol] || {
-    symbol,
-    ticker: symbol.replace(/\.(NS|BO)$/, ''),
-    name: symbol,
-    market: symbol.endsWith('.NS') || symbol.endsWith('.BO') ? 'NSE' : 'US',
-    currency: symbol.endsWith('.NS') || symbol.endsWith('.BO') ? 'INR' : 'USD',
-    sector: 'Equities',
-    basePrice: symbol.endsWith('.NS') || symbol.endsWith('.BO') ? 50 : 150,
-    marketCap: 'N/A',
-    peRatio: 'N/A',
-    high52: 180,
-    low52: 120,
-    volume: '2.5M',
-  };
+  const stockInfo = useMemo(() => {
+    return STOCK_DIRECTORY[symbol] || {
+      symbol,
+      ticker: symbol.replace(/\.(NS|BO)$/, ''),
+      name: symbol,
+      market: symbol.endsWith('.NS') || symbol.endsWith('.BO') ? 'NSE' : 'US',
+      currency: symbol.endsWith('.NS') || symbol.endsWith('.BO') ? 'INR' : 'USD',
+      sector: 'Equities',
+      basePrice: symbol.endsWith('.NS') || symbol.endsWith('.BO') ? 50 : 150,
+      marketCap: 'N/A',
+      peRatio: 'N/A',
+      high52: 180,
+      low52: 120,
+      volume: '2.5M',
+    };
+  }, [symbol]);
 
   const isIndia = stockInfo.market === 'NSE' || stockInfo.currency === 'INR' || symbol.endsWith('.NS') || symbol.endsWith('.BO');
   const currencySymbol = isIndia ? '₹' : '$';
@@ -123,6 +126,18 @@ export default function StockDetailPage() {
       clearInterval(countdownInterval);
     };
   }, [symbol, currencySymbol]);
+
+  // Synchronize normalized quote from the chart canvas
+  const handleQuoteSyncFromChart = useCallback((syncedQuote) => {
+    if (!syncedQuote || !syncedQuote.price) return;
+    setQuote((prev) => ({
+      ...prev,
+      ...syncedQuote,
+      name: prev?.name || stockInfo.name,
+      market: prev?.market || stockInfo.market,
+    }));
+    browserMarketServer.updateQuote(symbol, syncedQuote);
+  }, [symbol, stockInfo]);
 
   const currentPrice = quote?.price || stockInfo.basePrice || 150;
   const totalCost = Number((quantity * currentPrice).toFixed(2));
@@ -195,10 +210,17 @@ export default function StockDetailPage() {
     toast.success('Stock Link Copied to Clipboard!');
   };
 
-  // Day range progress
-  const dayLow = quote?.low || currentPrice * 0.985;
-  const dayHigh = quote?.high || currentPrice * 1.015;
+  // Day range bounds strictly harmonized with current price
+  const rawLow = quote?.low != null ? Number(quote.low) : currentPrice * 0.985;
+  const rawHigh = quote?.high != null ? Number(quote.high) : currentPrice * 1.015;
+  const dayLow = Math.min(rawLow, currentPrice);
+  const dayHigh = Math.max(rawHigh, currentPrice);
   const dayRangeProgress = Math.min(100, Math.max(0, ((currentPrice - dayLow) / (dayHigh - dayLow || 1)) * 100));
+
+  // Quote freshness telemetry
+  const quoteFreshness = useMemo(() => {
+    return getQuoteFreshness(quote || { price: currentPrice, timestamp: Date.now() });
+  }, [quote, currentPrice]);
 
   return (
     <div className="max-w-7xl mx-auto px-2.5 py-4 sm:px-6 lg:px-8 font-mono text-xs text-[#111111]">
@@ -253,7 +275,7 @@ export default function StockDetailPage() {
         </div>
 
         {/* Live Price Display */}
-        <div className="text-left md:text-right pt-2 md:pt-0 border-t md:border-t-0 border-[#111111]/20 w-full md:w-auto flex md:block items-baseline justify-between">
+        <div className="text-left md:text-right pt-2 md:pt-0 border-t md:border-t-0 border-[#111111]/20 w-full md:w-auto flex flex-col md:items-end justify-between">
           <div className="font-mono font-black text-2xl sm:text-4xl text-[#111111] tabular-nums">
             {currencySymbol}{currentPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </div>
@@ -262,10 +284,17 @@ export default function StockDetailPage() {
               quote.change >= 0 ? 'text-emerald-800' : 'text-red-800'
             }`}>
               {quote.change >= 0 ? <TrendingUp className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> : <TrendingDown className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
-              <span>{quote.change >= 0 ? '+' : ''}{quote.change} ({quote.changePercent}%)</span>
+              <span>{quote.change >= 0 ? '+' : ''}{Number(quote.change).toFixed(2)} ({Number(quote.changePercent).toFixed(2)}%)</span>
               <span className="text-[9px] sm:text-[10px] text-stone-500 font-normal ml-0.5 sm:ml-1">TODAY</span>
             </div>
           )}
+          {/* Quote Freshness & Exchange Timestamp */}
+          <div className="flex items-center gap-1.5 text-[10px] font-mono text-stone-500 mt-1 md:justify-end">
+            <span className={`w-1.5 h-1.5 rounded-full ${quoteFreshness.isStale ? 'bg-amber-500' : 'bg-emerald-600 animate-pulse'}`} />
+            <span>AS OF {quoteFreshness.asOf}</span>
+            <span className="text-stone-300">•</span>
+            <span className="font-semibold text-stone-700 uppercase">{quoteFreshness.label}</span>
+          </div>
         </div>
       </div>
 
@@ -312,11 +341,12 @@ export default function StockDetailPage() {
         {/* Left Column (2 cols): Interactive Candlestick Chart */}
         <div className="lg:col-span-2 space-y-6">
           {/* Candlestick Chart Container */}
-          <div className="newspaper-photo-plate p-1 bg-white">
+          <div className="newspaper-photo-plate p-1 bg-white overflow-hidden">
             <StockChart 
               symbol={symbol} 
               currencySymbol={currencySymbol} 
               livePrice={quote?.price}
+              onQuoteSync={handleQuoteSyncFromChart}
               activeIndicators={activeIndicators} 
               onToggleIndicator={toggleIndicator} 
             />

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { STOCK_DIRECTORY, getStockQuote, getOrderBook, fetchSingleYahooQuote } from '../lib/yahooFinance';
@@ -46,17 +46,19 @@ export default function StockDetailsPanel({ symbol, onClose }) {
     setMarketInfo(isMarketOpenForSymbol(symbol));
   }, [symbol, allowSandbox]);
 
-  const stockInfo = STOCK_DIRECTORY[symbol] || {
-    name: symbol,
-    ticker: symbol.replace(/\.(NS|BO)$/, ''),
-    market: symbol.endsWith('.NS') || symbol.endsWith('.BO') ? 'NSE' : 'US',
-    currency: symbol.endsWith('.NS') || symbol.endsWith('.BO') ? 'INR' : 'USD',
-    sector: 'Equities',
-    marketCap: 'N/A',
-    peRatio: 'N/A',
-    high52: 100,
-    low52: 50,
-  };
+  const stockInfo = useMemo(() => {
+    return STOCK_DIRECTORY[symbol] || {
+      name: symbol,
+      ticker: symbol.replace(/\.(NS|BO)$/, ''),
+      market: symbol.endsWith('.NS') || symbol.endsWith('.BO') ? 'NSE' : 'US',
+      currency: symbol.endsWith('.NS') || symbol.endsWith('.BO') ? 'INR' : 'USD',
+      sector: 'Equities',
+      marketCap: 'N/A',
+      peRatio: 'N/A',
+      high52: 100,
+      low52: 50,
+    };
+  }, [symbol]);
 
   const isIndia = stockInfo.market === 'NSE' || stockInfo.currency === 'INR' || symbol.endsWith('.NS') || symbol.endsWith('.BO');
   const currencySymbol = isIndia ? '₹' : '$';
@@ -84,6 +86,18 @@ export default function StockDetailsPanel({ symbol, onClose }) {
       unsubscribe();
     };
   }, [symbol, currencySymbol]);
+
+  // Synchronize normalized quote from the chart canvas
+  const handleQuoteSyncFromChart = useCallback((syncedQuote) => {
+    if (!syncedQuote || !syncedQuote.price) return;
+    setQuote((prev) => ({
+      ...prev,
+      ...syncedQuote,
+      name: prev?.name || stockInfo.name,
+      market: prev?.market || stockInfo.market,
+    }));
+    browserMarketServer.updateQuote(symbol, syncedQuote);
+  }, [symbol, stockInfo]);
 
   const currentPrice = quote?.price || stockInfo.basePrice || 100;
   const totalCost = Number((quantity * currentPrice).toFixed(2));
@@ -158,9 +172,11 @@ export default function StockDetailsPanel({ symbol, onClose }) {
     }
   };
 
-  // Day Range calculation
-  const dayLow = quote?.low || currentPrice * 0.99;
-  const dayHigh = quote?.high || currentPrice * 1.01;
+  // Day Range calculation strictly harmonized with current price
+  const rawLow = quote?.low != null ? Number(quote.low) : currentPrice * 0.99;
+  const rawHigh = quote?.high != null ? Number(quote.high) : currentPrice * 1.01;
+  const dayLow = Math.min(rawLow, currentPrice);
+  const dayHigh = Math.max(rawHigh, currentPrice);
   const dayRangeProgress = Math.min(100, Math.max(0, ((currentPrice - dayLow) / (dayHigh - dayLow || 1)) * 100));
 
   return (
@@ -226,8 +242,13 @@ export default function StockDetailsPanel({ symbol, onClose }) {
         {/* Left Column (2 cols): Interactive Candlestick Chart & Fundamental Metrics */}
         <div className="lg:col-span-2 space-y-4">
           {/* Lightweight Chart */}
-          <div className="border border-[#111111] p-1 bg-white">
-            <StockChart symbol={symbol} currencySymbol={currencySymbol} livePrice={quote?.price} />
+          <div className="border border-[#111111] p-1 bg-white overflow-hidden">
+            <StockChart 
+              symbol={symbol} 
+              currencySymbol={currencySymbol} 
+              livePrice={quote?.price} 
+              onQuoteSync={handleQuoteSyncFromChart}
+            />
           </div>
 
           {/* Fundamentals & Day Range Card */}

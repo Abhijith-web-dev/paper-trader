@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import { getQuoteFreshness, validateQuoteBounds } from '../src/lib/quoteFreshness.js';
 import { SCREENER_THRESHOLDS, evaluateStockTechnicalSignal } from '../src/lib/screenerEngine.js';
 import { STOCK_DIRECTORY } from '../src/lib/yahooFinance.js';
+import { synthesizeCandlesticks } from '../src/lib/microstructureEngine.js';
 
 console.log('🧪 Starting Automated Smoke Test Suite...');
 
@@ -233,4 +234,41 @@ console.log('  Testing Stock Directory Deduplication & Alias Resolution...');
 }
 console.log('  ✅ Stock Directory Deduplication & Alias Resolution passed.');
 
-console.log('\n🎉 ALL SMOKE TESTS PASSED SUCCESSFULLY! (6/6 test suites)');
+// =========================================================================
+// TEST 7: Intraday Candle & Session Range Invariants
+// =========================================================================
+console.log('  Testing Intraday Candle & Session Range Invariants...');
+{
+  ['1m', '3m', '5m', '1D'].forEach((tf) => {
+    const metrics = {
+      price: 1194.70,
+      open: 1195.00,
+      high: 1198.00,
+      low: 1184.00,
+      previousClose: 1201.80,
+      rawVolume: 5000000,
+    };
+
+    const result = synthesizeCandlesticks('RELIANCE.NS', metrics, tf);
+    assert.ok(result.candles.length >= 10, `${tf} must synthesize at least 10 bars`);
+    assert.equal(result.currentPrice, metrics.price, `${tf} currentPrice must match quote price`);
+    assert.ok(result.dayHigh >= result.currentPrice, `${tf} dayHigh must be >= currentPrice`);
+    assert.ok(result.dayLow <= result.currentPrice, `${tf} dayLow must be <= currentPrice`);
+
+    // Verify every single candle respects session bounds
+    for (const c of result.candles) {
+      assert.ok(c.high <= result.dayHigh + 0.001, `Candle high ${c.high} must not exceed dayHigh ${result.dayHigh}`);
+      assert.ok(c.low >= result.dayLow - 0.001, `Candle low ${c.low} must not be below dayLow ${result.dayLow}`);
+      assert.ok(c.high >= c.low, `Candle high must be >= low`);
+      assert.ok(c.high >= c.open && c.high >= c.close, `Candle high must envelope open/close`);
+      assert.ok(c.low <= c.open && c.low <= c.close, `Candle low must envelope open/close`);
+    }
+
+    // Verify last bar close strictly equals current quote price
+    const lastBar = result.candles[result.candles.length - 1];
+    assert.equal(lastBar.close, metrics.price, `${tf} last candle close must equal quote price`);
+  });
+}
+console.log('  ✅ Intraday Candle & Session Range Invariants passed.');
+
+console.log('\n🎉 ALL SMOKE TESTS PASSED SUCCESSFULLY! (7/7 test suites)');

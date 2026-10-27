@@ -189,6 +189,24 @@ class BrowserMarketServer {
     return { bids, asks };
   }
 
+  /**
+   * Synchronize and broadcast a normalized exchange quote to all listeners
+   */
+  updateQuote(symbol, quoteUpdate) {
+    if (!symbol || !quoteUpdate) return;
+    const upper = symbol.toUpperCase();
+    const existing = this.getQuoteSync(upper) || {};
+    const merged = {
+      ...existing,
+      ...quoteUpdate,
+      symbol: upper,
+      timestamp: quoteUpdate.timestamp || Date.now(),
+    };
+    this.memoryQuotes.set(upper, merged);
+    runtimePriceStore.set(upper, merged);
+    this._notifySubscribers(upper, merged);
+  }
+
   _notifySubscribers(symbol, quote) {
     const set = this.subscribers.get(symbol);
     if (set && set.size > 0) {

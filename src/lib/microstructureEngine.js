@@ -264,6 +264,10 @@ export function synthesizeCandlesticks(symbol, metrics, timeframe = '1D') {
     }
   }
 
+  const change = Number((close - prevClose).toFixed(2));
+  const changePercent = Number((((close - prevClose) / (prevClose || 1)) * 100).toFixed(2));
+  const quoteTimestamp = Date.now();
+
   return {
     candles,
     meta: {
@@ -278,6 +282,21 @@ export function synthesizeCandlesticks(symbol, metrics, timeframe = '1D') {
     dayHigh: high,
     dayLow: low,
     currentPrice: close,
+    change,
+    changePercent,
     isIntraday,
+    timestamp: quoteTimestamp,
+    quote: {
+      symbol,
+      price: close,
+      high,
+      low,
+      open,
+      previousClose: prevClose,
+      change,
+      changePercent,
+      timestamp: quoteTimestamp,
+      source: 'microstructure_calibrated_synthesis',
+    },
   };
 }
