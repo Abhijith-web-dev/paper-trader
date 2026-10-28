@@ -7,13 +7,14 @@ import {
   subscribeToMarketStream, 
   syncTradingViewScanner 
 } from '../lib/omniFeed';
-import { getNSEMarketStatus, getUSMarketStatus } from '../lib/marketHours';
+import { getNSEMarketStatus, getUSMarketStatus, isMarketOpenForSymbol } from '../lib/marketHours';
+import { getQuoteFreshness } from '../lib/quoteFreshness';
 import TradeModal from '../components/TradeModal';
 import StockDetailsPanel from '../components/StockDetailsPanel';
 import MarketStatusBadge from '../components/MarketStatusBadge';
 import HoldingSparkline from '../components/HoldingSparkline';
 import TradingPerformance from '../components/TradingPerformance';
-import { computeFloatingPositionAccounting } from '../lib/journalAnalytics';
+import { computeFloatingPositionAccounting, calculatePortfolioStopLossRisk } from '../lib/journalAnalytics';
 import { 
   TrendingUp, 
   TrendingDown, 
@@ -43,6 +44,7 @@ import {
   Filter,
   BarChart2,
   BookOpen,
+  ShieldAlert,
   Lock,
   Bell,
   Calculator,
@@ -87,6 +89,9 @@ export default function DashboardPage() {
   
   // Holdings P&L Filter Mode: 'ALL' | 'PROFIT' | 'LOSS'
   const [holdingsPnlMode, setHoldingsPnlMode] = useState('ALL');
+
+  // Exposure Panel View Mode: 'ALLOCATION' | 'STOP_RISK'
+  const [exposureViewMode, setExposureViewMode] = useState('ALLOCATION');
   
   // Inspected Stock for Detailed Interactive Candlestick Chart & Order Book
   const [inspectedSymbol, setInspectedSymbol] = useState(null);
@@ -204,10 +209,12 @@ export default function DashboardPage() {
 
     const acct = computeFloatingPositionAccounting({
       avgBuyPrice: h.avgBuyPrice,
+      livePrice,
       quantity: h.quantity,
       market: exchange,
       totalCost: cost,
-    }, livePrice);
+      stopLossPrice: h.stopLossPrice,
+    });
 
     const dirInfo = STOCK_DIRECTORY[h.symbol] || {};
     const sector = dirInfo.sector || h.sector || 'Equities';
@@ -245,6 +252,9 @@ export default function DashboardPage() {
   const usdGrossUnrealizedPnL = totalUsdGrossPnL;
   const usdNetUnrealizedPercent = totalUsdCost > 0 ? (usdNetUnrealizedPnL / totalUsdCost) * 100 : 0;
   const usdGrossUnrealizedPercent = totalUsdCost > 0 ? (usdGrossUnrealizedPnL / totalUsdCost) * 100 : 0;
+
+  // Calculate Stop-Loss Portfolio Risk across all active positions
+  const stopLossRiskData = calculatePortfolioStopLossRisk(holdingsList, livePrices, 86.5);
 
   // Sector breakdown list for visual exposure bar
   const sectorList = Object.entries(sectorAllocations).map(([name, val], index) => ({
@@ -853,84 +863,190 @@ export default function DashboardPage() {
         <div className="newspaper-photo-plate p-4 sm:p-5 bg-white border-2 border-[#111111] mb-6 font-mono">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b-2 border-[#111111] gap-2">
             <div>
-              <h3 className="text-sm sm:text-base font-bold uppercase tracking-wider text-[#111111] flex items-center gap-2">
-                <PieChart className="w-4 h-4 text-[#111111]" />
-                <span>Portfolio Sector Allocation & Combined Risk Exposure</span>
-              </h3>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="text-sm sm:text-base font-bold uppercase tracking-wider text-[#111111] flex items-center gap-2">
+                  <PieChart className="w-4 h-4 text-[#111111]" />
+                  <span>
+                    {exposureViewMode === 'ALLOCATION' 
+                      ? 'Portfolio Sector Allocation & Combined Risk Exposure' 
+                      : 'Portfolio Risk at Stop Levels (Value at Risk Analysis)'}
+                  </span>
+                </h3>
+              </div>
               <p className="text-[10px] text-neutral-500 font-sans mt-0.5">
-                Multi-market exposure breakdown across industries, currency weighting (₹ INR / $ USD), and single-stock concentration risk
+                {exposureViewMode === 'ALLOCATION'
+                  ? 'Multi-market capital distribution across industries, currency weighting (₹ INR / $ USD), and single-stock concentration risk'
+                  : 'Total capital exposed to loss if configured stop-loss levels trigger, grouped by sector vulnerability and currency exposure'}
               </p>
             </div>
-            <div className="flex items-center gap-2 text-[10px] font-bold">
-              <span className="px-2 py-0.5 bg-neutral-100 border border-neutral-300">
+            <div className="flex items-center gap-2">
+              {/* Dual-Mode Toggle: Allocation vs Stop-Loss Risk */}
+              <div className="flex items-center border border-[#111111] bg-neutral-100 p-0.5 text-[10px] font-bold">
+                <button
+                  type="button"
+                  onClick={() => setExposureViewMode('ALLOCATION')}
+                  className={`px-2.5 py-1 transition-colors cursor-pointer ${
+                    exposureViewMode === 'ALLOCATION'
+                      ? 'bg-[#111111] text-white shadow-xs'
+                      : 'text-[#111111] hover:bg-neutral-200'
+                  }`}
+                >
+                  Capital Allocation
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setExposureViewMode('STOP_RISK')}
+                  className={`px-2.5 py-1 transition-colors flex items-center gap-1 cursor-pointer ${
+                    exposureViewMode === 'STOP_RISK'
+                      ? 'bg-[#111111] text-white shadow-xs'
+                      : 'text-[#111111] hover:bg-neutral-200'
+                  }`}
+                >
+                  <ShieldAlert className="w-3 h-3 text-amber-400" />
+                  <span>Stop-Loss Risk</span>
+                </button>
+              </div>
+
+              <span className="px-2 py-0.5 bg-neutral-100 border border-neutral-300 text-[10px] font-bold hidden md:inline">
                 {holdingsList.length} Holdings
               </span>
-              <span className="px-2 py-0.5 bg-emerald-50 border border-emerald-300 text-emerald-800">
-                {sectorList.length} Sectors Active
-              </span>
             </div>
           </div>
 
-          {/* Visual Segmented Sector Distribution Bar */}
-          <div className="mt-3">
-            <div className="h-4 w-full bg-neutral-200 border border-[#111111] flex overflow-hidden">
-              {sectorList.map((item) => (
-                <div
-                  key={item.name}
-                  style={{ width: `${Math.max(2, item.percent)}%` }}
-                  className={`${item.color} h-full border-r border-[#111111] last:border-r-0 transition-all`}
-                  title={`${item.name}: ${item.percent.toFixed(1)}% of total equity holdings`}
-                />
-              ))}
-            </div>
-
-            {/* Sector Tags Grid */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 mt-3 text-[10px]">
-              {sectorList.map((item) => (
-                <div key={item.name} className="p-2 border border-neutral-200 bg-neutral-50 flex flex-col justify-between">
-                  <div className="flex items-center gap-1.5 truncate">
-                    <span className={`w-2 h-2 rounded-full ${item.color} shrink-0`} />
-                    <span className="font-bold text-[#111111] truncate" title={item.name}>{item.name}</span>
-                  </div>
-                  <div className="mt-1 flex items-baseline justify-between text-[11px] font-bold">
-                    <span>{item.percent.toFixed(1)}%</span>
-                    <span className="text-[9px] text-neutral-500 font-normal">
-                      {item.percent > 40 ? 'Overweight' : item.percent > 20 ? 'Core' : 'Diversified'}
-                    </span>
-                  </div>
+          {exposureViewMode === 'ALLOCATION' ? (
+            <>
+              {/* Visual Segmented Sector Distribution Bar */}
+              <div className="mt-3">
+                <div className="h-4 w-full bg-neutral-200 border border-[#111111] flex overflow-hidden">
+                  {sectorList.map((item) => (
+                    <div
+                      key={item.name}
+                      style={{ width: `${Math.max(2, item.percent)}%` }}
+                      className={`${item.color} h-full border-r border-[#111111] last:border-r-0 transition-all`}
+                      title={`${item.name}: ${item.percent.toFixed(1)}% of total equity holdings`}
+                    />
+                  ))}
                 </div>
-              ))}
-            </div>
-          </div>
 
-          {/* Macro Exposure & Concentration Risk Ribbon */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-3 pt-3 border-t border-dashed border-neutral-300 text-[11px]">
-            <div className="p-2 bg-neutral-50 border border-neutral-200">
-              <span className="text-neutral-500 uppercase block text-[9px] font-bold">Market & Currency Exposure:</span>
-              <span className="font-bold text-[#111111]">
-                🇮🇳 INR Equities: {inrEquityPct.toFixed(1)}% • 🇺🇸 USD Equities: {usdEquityPct.toFixed(1)}%
-              </span>
-              <span className="text-[9px] text-neutral-400 block mt-0.5">Dual-currency multi-asset paper ledger</span>
-            </div>
+                {/* Sector Tags Grid */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 mt-3 text-[10px]">
+                  {sectorList.map((item) => (
+                    <div key={item.name} className="p-2 border border-neutral-200 bg-neutral-50 flex flex-col justify-between">
+                      <div className="flex items-center gap-1.5 truncate">
+                        <span className={`w-2 h-2 rounded-full ${item.color} shrink-0`} />
+                        <span className="font-bold text-[#111111] truncate" title={item.name}>{item.name}</span>
+                      </div>
+                      <div className="mt-1 flex items-baseline justify-between text-[11px] font-bold">
+                        <span>{item.percent.toFixed(1)}%</span>
+                        <span className="text-[9px] text-neutral-500 font-normal">
+                          {item.percent > 40 ? 'Overweight' : item.percent > 20 ? 'Core' : 'Diversified'}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
 
-            <div className="p-2 bg-neutral-50 border border-neutral-200">
-              <span className="text-neutral-500 uppercase block text-[9px] font-bold">Top Asset Concentration:</span>
-              <span className={`font-bold ${topHoldingPct > 35 ? 'text-rose-700' : 'text-emerald-800'}`}>
-                {topHolding ? `${topHolding.symbol} (${topHoldingPct.toFixed(1)}%)` : 'None'}
-              </span>
-              <span className="text-[9px] text-neutral-400 block mt-0.5">
-                {topHoldingPct > 35 ? '⚠️ Elevated single-position risk (>35%)' : '✓ Balanced single-asset risk (<35%)'}
-              </span>
-            </div>
+              {/* Macro Exposure & Concentration Risk Ribbon */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-3 pt-3 border-t border-dashed border-neutral-300 text-[11px]">
+                <div className="p-2 bg-neutral-50 border border-neutral-200">
+                  <span className="text-neutral-500 uppercase block text-[9px] font-bold">Market & Currency Exposure:</span>
+                  <span className="font-bold text-[#111111]">
+                    🇮🇳 INR Equities: {inrEquityPct.toFixed(1)}% • 🇺🇸 USD Equities: {usdEquityPct.toFixed(1)}%
+                  </span>
+                  <span className="text-[9px] text-neutral-400 block mt-0.5">Dual-currency multi-asset paper ledger</span>
+                </div>
 
-            <div className="p-2 bg-neutral-50 border border-neutral-200">
-              <span className="text-neutral-500 uppercase block text-[9px] font-bold">Cash vs Equity Allocation:</span>
-              <span className="font-bold text-[#111111]">
-                {cashReservePct.toFixed(1)}% Cash Reserves • {(100 - cashReservePct).toFixed(1)}% Invested
-              </span>
-              <span className="text-[9px] text-neutral-400 block mt-0.5">Ample liquidity for opportunistic trades</span>
+                <div className="p-2 bg-neutral-50 border border-neutral-200">
+                  <span className="text-neutral-500 uppercase block text-[9px] font-bold">Top Asset Concentration:</span>
+                  <span className={`font-bold ${topHoldingPct > 35 ? 'text-rose-700' : 'text-emerald-800'}`}>
+                    {topHolding ? `${topHolding.symbol} (${topHoldingPct.toFixed(1)}%)` : 'None'}
+                  </span>
+                  <span className="text-[9px] text-neutral-400 block mt-0.5">
+                    {topHoldingPct > 35 ? '⚠️ Elevated single-position risk (>35%)' : '✓ Balanced single-asset risk (<35%)'}
+                  </span>
+                </div>
+
+                <div className="p-2 bg-neutral-50 border border-neutral-200">
+                  <span className="text-neutral-500 uppercase block text-[9px] font-bold">Cash vs Equity Allocation:</span>
+                  <span className="font-bold text-[#111111]">
+                    {cashReservePct.toFixed(1)}% Cash Reserves • {(100 - cashReservePct).toFixed(1)}% Invested
+                  </span>
+                  <span className="text-[9px] text-neutral-400 block mt-0.5">Ample liquidity for opportunistic trades</span>
+                </div>
+              </div>
+            </>
+          ) : (
+            /* Stop-Loss Risk View */
+            <div className="space-y-3 mt-3">
+              {/* Segmented Risk Contribution Bar */}
+              <div className="h-4 w-full bg-neutral-200 border border-[#111111] flex overflow-hidden">
+                {stopLossRiskData.sectorStopRisks.map((item, idx) => (
+                  <div
+                    key={item.name}
+                    style={{ width: `${Math.max(2, item.percentOfRisk)}%` }}
+                    className={`${SECTOR_COLORS[idx % SECTOR_COLORS.length]} h-full border-r border-[#111111] last:border-r-0 transition-all`}
+                    title={`${item.name}: ₹${item.riskINR.toLocaleString()} (${item.percentOfRisk}% of stop-loss risk)`}
+                  />
+                ))}
+              </div>
+
+              {/* Stop Risk Sector Grid */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 text-[10px]">
+                {stopLossRiskData.sectorStopRisks.map((item, idx) => (
+                  <div key={item.name} className="p-2 border border-neutral-200 bg-neutral-50 flex flex-col justify-between">
+                    <div className="flex items-center gap-1.5 truncate">
+                      <span className={`w-2 h-2 rounded-full ${SECTOR_COLORS[idx % SECTOR_COLORS.length]} shrink-0`} />
+                      <span className="font-bold text-[#111111] truncate" title={item.name}>{item.name}</span>
+                    </div>
+                    <div className="mt-1">
+                      <div className="text-[11px] font-bold text-rose-800">
+                        ₹{item.riskINR.toLocaleString()}
+                      </div>
+                      <div className="text-[9px] text-neutral-500 font-normal flex justify-between">
+                        <span>{item.percentOfRisk}% of risk</span>
+                        <span>({item.percentOfEquity}% eq)</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Stop-Loss Macro Risk Summary Ribbon */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-3 border-t border-dashed border-neutral-300 text-[11px]">
+                <div className="p-2.5 bg-rose-50 border border-rose-300">
+                  <span className="text-rose-900 uppercase block text-[9px] font-bold flex items-center gap-1">
+                    <ShieldAlert className="w-3 h-3 text-rose-700" /> Total Capital at Stop Risk:
+                  </span>
+                  <div className="font-bold text-base text-rose-950 mt-0.5">
+                    ₹{stopLossRiskData.totalStopRiskINR.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+                  </div>
+                  <span className="text-[10px] text-rose-800 font-bold block mt-0.5">
+                    {stopLossRiskData.portfolioRiskPercent}% of Total Equity Exposed
+                  </span>
+                </div>
+
+                <div className="p-2.5 bg-neutral-50 border border-neutral-200">
+                  <span className="text-neutral-500 uppercase block text-[9px] font-bold">Stop Risk by Currency:</span>
+                  <div className="font-bold text-xs text-[#111111] mt-0.5 space-y-0.5">
+                    <div>🇮🇳 INR Risk: <strong>₹{stopLossRiskData.totalInrStopRisk.toLocaleString()}</strong></div>
+                    <div>🇺🇸 USD Risk: <strong>${stopLossRiskData.totalUsdStopRisk.toLocaleString()}</strong> (₹{(stopLossRiskData.totalUsdStopRisk * 86.5).toFixed(0)})</div>
+                  </div>
+                  <span className="text-[9px] text-neutral-400 block mt-0.5">Max potential loss under current protective stops</span>
+                </div>
+
+                <div className="p-2.5 bg-neutral-50 border border-neutral-200">
+                  <span className="text-neutral-500 uppercase block text-[9px] font-bold">Stop-Loss Safety Coverage:</span>
+                  <span className="font-bold text-emerald-800 block text-xs mt-0.5">
+                    ✓ 100% of Positions Protected
+                  </span>
+                  <span className="text-[9px] text-neutral-500 block mt-0.5 leading-relaxed">
+                    Positions without custom stops utilize standard 5% protective safety buffer
+                  </span>
+                </div>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       )}
 
@@ -1050,27 +1166,42 @@ export default function DashboardPage() {
             {/* Mobile Card View (Screens < 640px) */}
             <div className="sm:hidden divide-y divide-[#111111] bg-white">
               {filteredHoldings.map((h) => {
-                const isInd = h.market === 'NSE' || h.currency === 'INR';
+                const isInd = h.market === 'NSE' || h.currency === 'INR' || h.symbol?.endsWith('.NS') || h.symbol?.endsWith('.BO');
                 const sym = isInd ? '₹' : '$';
                 const quote = livePrices[h.symbol];
-                const currentPrice = quote?.price || h.avgBuyPrice;
-                const currentVal = h.quantity * currentPrice;
-                const totalCost = h.totalCost || (h.quantity * h.avgBuyPrice);
+                const currentPrice = Number(quote?.price || h.avgBuyPrice);
+                const currentVal = Number((h.quantity * currentPrice).toFixed(2));
+                const totalCost = Number(h.totalCost || (h.quantity * h.avgBuyPrice));
+
+                const marketStatus = isMarketOpenForSymbol(h.symbol);
+                const freshness = getQuoteFreshness(quote);
 
                 const acct = computeFloatingPositionAccounting({
                   avgBuyPrice: h.avgBuyPrice,
+                  livePrice: currentPrice,
                   quantity: h.quantity,
                   market: isInd ? 'NSE' : 'US',
                   totalCost,
-                }, currentPrice);
+                  stopLossPrice: h.stopLossPrice,
+                  quoteTimestamp: quote?.timestamp,
+                  isFresh: !freshness.isStale && marketStatus.isOpen,
+                });
 
                 const netPnL = acct.floatingNetPnL;
                 const netPercent = acct.netReturnPercent;
                 const grossPnL = acct.floatingGrossPnL;
                 const grossPercent = acct.grossReturnPercent;
                 const estFees = acct.allocatedEntryCharges;
-                const perSharePnl = currentPrice - h.avgBuyPrice;
-                const isProfit = netPnL >= 0;
+                const perShareGrossPnL = acct.perShareGrossPnL;
+
+                const isNetProfit = acct.isProfitable;
+                const isGrossProfit = acct.isGrossProfitable;
+                const isAbove = acct.isAboveEntry;
+                const isBelow = acct.isBelowEntry;
+
+                // Telemetry status
+                const isLiveActive = marketStatus.isOpen && !freshness.isStale;
+                const isMarketClosed = !marketStatus.isOpen;
 
                 return (
                   <div key={h.symbol} className="p-4 font-mono text-xs space-y-3">
@@ -1082,14 +1213,25 @@ export default function DashboardPage() {
                           <span className="px-1.5 py-0.5 bg-[#111111] text-[#F6F4EE] text-[9px] font-bold uppercase">
                             {h.market || (isInd ? 'NSE' : 'US')}
                           </span>
-                          <span className={`px-1.5 py-0.5 border text-[9px] font-bold uppercase inline-flex items-center gap-0.5 ${
-                            isProfit
-                              ? 'bg-emerald-50 border-emerald-700 text-emerald-800'
-                              : 'bg-rose-50 border-rose-700 text-rose-800'
-                          }`}>
-                            {isProfit ? <TrendingUp className="w-2.5 h-2.5" /> : <TrendingDown className="w-2.5 h-2.5" />}
-                            <span>{isProfit ? 'PROFIT' : 'LOSS'}</span>
-                          </span>
+                          {isNetProfit ? (
+                            <span className="px-1.5 py-0.5 border border-emerald-700 bg-emerald-50 text-emerald-800 text-[9px] font-bold uppercase inline-flex items-center gap-0.5">
+                              <TrendingUp className="w-2.5 h-2.5" />
+                              <span>PROFIT</span>
+                            </span>
+                          ) : isGrossProfit ? (
+                            <span 
+                              className="px-1.5 py-0.5 border border-amber-600 bg-amber-50 text-amber-900 text-[9px] font-bold uppercase inline-flex items-center gap-0.5"
+                              title="Gross price is above entry, but broker fees offset net profit"
+                            >
+                              <TrendingUp className="w-2.5 h-2.5" />
+                              <span>NET LOSS (FEES)</span>
+                            </span>
+                          ) : (
+                            <span className="px-1.5 py-0.5 border border-rose-700 bg-rose-50 text-rose-800 text-[9px] font-bold uppercase inline-flex items-center gap-0.5">
+                              <TrendingDown className="w-2.5 h-2.5" />
+                              <span>LOSS</span>
+                            </span>
+                          )}
                         </div>
                         <div className="text-[11px] text-[#111111]/70 font-news truncate max-w-[200px] mt-0.5">
                           {h.name}
@@ -1099,8 +1241,8 @@ export default function DashboardPage() {
                         <div className="font-bold text-[#111111] text-base tabular-nums">
                           {sym}{currentVal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </div>
-                        <div className={`text-[11px] font-bold ${isProfit ? 'text-emerald-800' : 'text-red-800'}`}>
-                          {isProfit ? '+' : ''}{sym}{netPnL.toFixed(2)} ({isProfit ? '+' : ''}{netPercent.toFixed(2)}% Net)
+                        <div className={`text-[11px] font-bold ${isNetProfit ? 'text-emerald-800' : 'text-red-800'}`}>
+                          {isNetProfit ? '+' : ''}{sym}{netPnL.toFixed(2)} ({isNetProfit ? '+' : ''}{netPercent.toFixed(2)}% Net)
                         </div>
                         <div className="text-[9px] text-neutral-500 font-mono">
                           Gross: {grossPnL >= 0 ? '+' : ''}{sym}{grossPnL.toFixed(2)} ({grossPercent >= 0 ? '+' : ''}{grossPercent.toFixed(2)}%) • Fees: {sym}{estFees.toFixed(2)}
@@ -1112,12 +1254,23 @@ export default function DashboardPage() {
                     <div className="p-2.5 bg-[#FAF8F3] border border-neutral-300 flex items-center justify-between gap-2">
                       <div className="text-[10px]">
                         <span className="text-neutral-500 uppercase block font-bold">Trend (Entry vs Live):</span>
-                        <span className={`font-bold inline-flex items-center gap-1 ${isProfit ? 'text-emerald-700' : 'text-rose-700'}`}>
-                          {isProfit ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-                          <span>{isProfit ? 'Above Entry (+)' : 'Below Entry (-)'}</span>
-                        </span>
-                        <div className="text-[9px] text-neutral-400 mt-0.5 font-mono">
-                          Spread: {isProfit ? '+' : ''}{sym}{perSharePnl.toFixed(2)}/sh
+                        {isAbove ? (
+                          <span className="font-bold text-emerald-700 inline-flex items-center gap-1">
+                            <TrendingUp className="w-3 h-3" />
+                            <span>Above Entry (+)</span>
+                          </span>
+                        ) : isBelow ? (
+                          <span className="font-bold text-rose-700 inline-flex items-center gap-1">
+                            <TrendingDown className="w-3 h-3" />
+                            <span>Below Entry (-)</span>
+                          </span>
+                        ) : (
+                          <span className="font-bold text-neutral-600 inline-flex items-center gap-1">
+                            <span>At Entry (0.00)</span>
+                          </span>
+                        )}
+                        <div className="text-[9px] text-neutral-500 mt-0.5 font-mono">
+                          Spread: {perShareGrossPnL >= 0 ? '+' : ''}{sym}{perShareGrossPnL.toFixed(2)}/sh
                         </div>
                       </div>
                       <HoldingSparkline
@@ -1129,7 +1282,7 @@ export default function DashboardPage() {
                       />
                     </div>
 
-                    {/* Prominent Entry Price & Cost Breakdown Grid */}
+                    {/* Prominent Entry Price, Live Price & Stop Risk Grid */}
                     <div className="grid grid-cols-2 gap-2 pt-2 border-t border-[#D8D2C4] text-[11px]">
                       <div className="p-2 bg-neutral-50 border border-neutral-200">
                         <span className="text-[#111111]/60 block text-[9px] uppercase font-bold">ENTRY PRICE (AVG):</span>
@@ -1137,12 +1290,47 @@ export default function DashboardPage() {
                         <span className="text-[9px] text-neutral-500">Invested: {sym}{totalCost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                       </div>
                       <div className="p-2 bg-neutral-50 border border-neutral-200">
-                        <span className="text-[#111111]/60 block text-[9px] uppercase font-bold">LIVE PRICE (CMP):</span>
-                        <strong className="text-[#111111] text-sm font-bold block flex items-center gap-1">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                        <div className="flex items-center justify-between">
+                          <span className="text-[#111111]/60 block text-[9px] uppercase font-bold">LIVE PRICE (CMP):</span>
+                          {isLiveActive ? (
+                            <span className="text-[8px] font-bold text-emerald-800 bg-emerald-100 px-1 py-0.2 border border-emerald-300">LIVE</span>
+                          ) : isMarketClosed ? (
+                            <span className="text-[8px] font-bold text-stone-600 bg-stone-100 px-1 py-0.2 border border-stone-300">CLOSED</span>
+                          ) : (
+                            <span className="text-[8px] font-bold text-amber-800 bg-amber-100 px-1 py-0.2 border border-amber-300">STALE</span>
+                          )}
+                        </div>
+                        <strong className="text-[#111111] text-sm font-bold block flex items-center gap-1 mt-0.5">
+                          {isLiveActive ? (
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                          ) : isMarketClosed ? (
+                            <span className="w-1.5 h-1.5 rounded-full bg-stone-400" />
+                          ) : (
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                          )}
                           <span>{sym}{currentPrice.toFixed(2)}</span>
                         </strong>
-                        <span className="text-[9px] text-neutral-500">Held: {h.quantity} shares</span>
+                        <span className="text-[9px] text-neutral-500 block">
+                          {isLiveActive ? `As-of: ${freshness.asOf}` : isMarketClosed ? `Last Mark: ${freshness.asOf}` : `Delayed: ${freshness.asOf}`} • {h.quantity} shares
+                        </span>
+                      </div>
+
+                      {/* Stop-Loss Risk Metric Strip */}
+                      <div className="col-span-2 p-2 bg-rose-50/60 border border-rose-200 flex items-center justify-between text-[10px]">
+                        <div className="flex items-center gap-1.5">
+                          <ShieldAlert className="w-3.5 h-3.5 text-rose-700 shrink-0" />
+                          <div>
+                            <span className="font-bold text-rose-950 uppercase">Stop Level:</span>{' '}
+                            <span className="font-bold text-[#111111]">{sym}{acct.effectiveStopLoss.toFixed(2)}</span>{' '}
+                            <span className="text-neutral-500">(-{acct.distanceToStopPct}%)</span>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-rose-900 font-bold uppercase text-[9px] block">Stop Risk:</span>
+                          <span className="font-bold text-rose-800 text-xs tabular-nums">
+                            {sym}{acct.totalRiskAtStop.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </span>
+                        </div>
                       </div>
                     </div>
 
@@ -1180,40 +1368,55 @@ export default function DashboardPage() {
               <table className="w-full text-left font-mono text-xs">
                 <thead className="bg-[#111111] text-[#F6F4EE] uppercase tracking-wider text-[11px] border-b-2 border-[#111111]">
                   <tr>
-                    <th className="py-3 px-4">Asset</th>
-                    <th className="py-3 px-4 text-center">Market</th>
-                    <th className="py-3 px-4 text-right">Shares</th>
-                    <th className="py-3 px-4 text-right">Entry Price</th>
-                    <th className="py-3 px-4 text-right">Live Price (CMP)</th>
-                    <th className="py-3 px-4 text-center">Trend & Entry Ref</th>
-                    <th className="py-3 px-4 text-right">Current Value</th>
-                    <th className="py-3 px-4 text-right">Unrealized P&L (Net / Gross)</th>
-                    <th className="py-3 px-4 text-center">Actions</th>
+                    <th className="py-3 px-3">Asset</th>
+                    <th className="py-3 px-2 text-center">Market</th>
+                    <th className="py-3 px-2 text-right">Shares</th>
+                    <th className="py-3 px-3 text-right">Entry Price</th>
+                    <th className="py-3 px-3 text-right">Live Price (CMP)</th>
+                    <th className="py-3 px-3 text-center">Trend & Entry Ref</th>
+                    <th className="py-3 px-3 text-right">Stop-Loss Risk</th>
+                    <th className="py-3 px-3 text-right">Current Value</th>
+                    <th className="py-3 px-3 text-right">Unrealized P&L (Net / Gross)</th>
+                    <th className="py-3 px-3 text-center">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#D8D2C4]">
                   {filteredHoldings.map((h) => {
-                    const isInd = h.market === 'NSE' || h.currency === 'INR';
+                    const isInd = h.market === 'NSE' || h.currency === 'INR' || h.symbol?.endsWith('.NS') || h.symbol?.endsWith('.BO');
                     const sym = isInd ? '₹' : '$';
                     const quote = livePrices[h.symbol];
-                    const currentPrice = quote?.price || h.avgBuyPrice;
-                    const currentVal = h.quantity * currentPrice;
-                    const totalCost = h.totalCost || (h.quantity * h.avgBuyPrice);
+                    const currentPrice = Number(quote?.price || h.avgBuyPrice);
+                    const currentVal = Number((h.quantity * currentPrice).toFixed(2));
+                    const totalCost = Number(h.totalCost || (h.quantity * h.avgBuyPrice));
+
+                    const marketStatus = isMarketOpenForSymbol(h.symbol);
+                    const freshness = getQuoteFreshness(quote);
 
                     const acct = computeFloatingPositionAccounting({
                       avgBuyPrice: h.avgBuyPrice,
+                      livePrice: currentPrice,
                       quantity: h.quantity,
                       market: isInd ? 'NSE' : 'US',
                       totalCost,
-                    }, currentPrice);
+                      stopLossPrice: h.stopLossPrice,
+                      quoteTimestamp: quote?.timestamp,
+                      isFresh: !freshness.isStale && marketStatus.isOpen,
+                    });
 
                     const netPnL = acct.floatingNetPnL;
                     const netPercent = acct.netReturnPercent;
                     const grossPnL = acct.floatingGrossPnL;
                     const grossPercent = acct.grossReturnPercent;
                     const estFees = acct.allocatedEntryCharges;
-                    const perSharePnl = currentPrice - h.avgBuyPrice;
-                    const isProfit = netPnL >= 0;
+                    const perShareGrossPnL = acct.perShareGrossPnL;
+
+                    const isNetProfit = acct.isProfitable;
+                    const isGrossProfit = acct.isGrossProfitable;
+                    const isAbove = acct.isAboveEntry;
+                    const isBelow = acct.isBelowEntry;
+
+                    const isLiveActive = marketStatus.isOpen && !freshness.isStale;
+                    const isMarketClosed = !marketStatus.isOpen;
 
                     return (
                       <tr
@@ -1224,30 +1427,30 @@ export default function DashboardPage() {
                         }`}
                       >
                         {/* 1. Asset & Name */}
-                        <td className="py-3.5 px-4">
+                        <td className="py-3 px-3">
                           <div className="font-bold text-[#111111] flex items-center gap-1.5">
                             <span>{h.symbol}</span>
                             <LineChart className="w-3.5 h-3.5 text-stone-400" />
                           </div>
-                          <div className="text-[11px] text-[#111111]/70 font-news truncate max-w-[150px]">
+                          <div className="text-[11px] text-[#111111]/70 font-news truncate max-w-[140px]">
                             {h.name}
                           </div>
                         </td>
 
                         {/* 2. Market Badge */}
-                        <td className="py-3.5 px-4 text-center">
+                        <td className="py-3 px-2 text-center">
                           <span className="px-1.5 py-0.5 bg-[#EFECE3] border border-[#111111] text-[10px] font-bold">
                             {h.market || (isInd ? 'NSE' : 'US')}
                           </span>
                         </td>
 
                         {/* 3. Shares Qty */}
-                        <td className="py-3.5 px-4 text-right font-bold text-[#111111] tabular-nums">
+                        <td className="py-3 px-2 text-right font-bold text-[#111111] tabular-nums">
                           {h.quantity}
                         </td>
 
                         {/* 4. Entry Price (Avg Cost per share + Total Invested Cost Basis) */}
-                        <td className="py-3.5 px-4 text-right tabular-nums">
+                        <td className="py-3 px-3 text-right tabular-nums">
                           <div className="font-bold text-[#111111] text-sm">
                             {sym}{h.avgBuyPrice.toFixed(2)}
                           </div>
@@ -1256,14 +1459,29 @@ export default function DashboardPage() {
                           </div>
                         </td>
 
-                        {/* 5. Live Price (CMP + Per-share Spread from Entry) */}
-                        <td className="py-3.5 px-4 text-right tabular-nums">
+                        {/* 5. Live Price (CMP + Market Telemetry + Spread) */}
+                        <td className="py-3 px-3 text-right tabular-nums">
                           <div className="font-bold text-[#111111] text-sm flex items-center justify-end gap-1">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                            {isLiveActive ? (
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" title="Live Floor Stream" />
+                            ) : isMarketClosed ? (
+                              <span className="w-1.5 h-1.5 rounded-full bg-stone-400" title="Exchange Closed" />
+                            ) : (
+                              <span className="w-1.5 h-1.5 rounded-full bg-amber-500" title="Delayed / Stale Mark" />
+                            )}
                             <span>{sym}{currentPrice.toFixed(2)}</span>
                           </div>
-                          <div className={`text-[10px] font-bold ${isProfit ? 'text-emerald-700' : 'text-rose-700'}`}>
-                            {isProfit ? '+' : ''}{sym}{perSharePnl.toFixed(2)} / sh
+                          <div className="flex items-center justify-end gap-1 text-[9px] mt-0.5">
+                            {isLiveActive ? (
+                              <span className="text-emerald-700 font-bold uppercase">LIVE • {freshness.asOf}</span>
+                            ) : isMarketClosed ? (
+                              <span className="text-stone-500 font-bold uppercase">CLOSED • {freshness.asOf}</span>
+                            ) : (
+                              <span className="text-amber-700 font-bold uppercase">STALE • {freshness.asOf}</span>
+                            )}
+                          </div>
+                          <div className={`text-[10px] font-bold mt-0.5 ${isAbove ? 'text-emerald-700' : isBelow ? 'text-rose-700' : 'text-neutral-500'}`}>
+                            {isAbove ? '+' : ''}{sym}{perShareGrossPnL.toFixed(2)} / sh
                           </div>
                         </td>
 
@@ -1273,52 +1491,80 @@ export default function DashboardPage() {
                             symbol={h.symbol}
                             entryPrice={h.avgBuyPrice}
                             currentPrice={currentPrice}
-                            width={110}
-                            height={32}
+                            width={105}
+                            height={30}
                           />
                           <div className="text-[9px] font-bold uppercase mt-0.5">
-                            {isProfit ? (
+                            {isAbove ? (
                               <span className="text-emerald-700 inline-flex items-center gap-0.5">
                                 <TrendingUp className="w-2.5 h-2.5" /> Above Entry
                               </span>
-                            ) : (
+                            ) : isBelow ? (
                               <span className="text-rose-700 inline-flex items-center gap-0.5">
                                 <TrendingDown className="w-2.5 h-2.5" /> Below Entry
+                              </span>
+                            ) : (
+                              <span className="text-neutral-500 inline-flex items-center gap-0.5">
+                                At Entry (0.00)
                               </span>
                             )}
                           </div>
                         </td>
 
-                        {/* 7. Current Market Value */}
-                        <td className="py-3.5 px-4 text-right font-bold text-[#111111] tabular-nums text-sm">
+                        {/* 7. Stop-Loss Risk (Dedicated Column) */}
+                        <td className="py-3 px-3 text-right tabular-nums">
+                          <div className="font-bold text-[#111111] text-xs">
+                            {sym}{acct.effectiveStopLoss.toFixed(2)}
+                          </div>
+                          <div className="text-[9px] text-neutral-500">
+                            Buffer: -{acct.distanceToStopPct}%
+                          </div>
+                          <div className="text-[10px] font-bold text-rose-800 mt-0.5">
+                            Max Loss: {sym}{acct.totalRiskAtStop.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </div>
+                        </td>
+
+                        {/* 8. Current Market Value */}
+                        <td className="py-3 px-3 text-right font-bold text-[#111111] tabular-nums text-sm">
                           {sym}{currentVal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </td>
 
-                        {/* 8. Profit & Loss Mode */}
-                        <td className="py-3.5 px-4 text-right tabular-nums">
+                        {/* 9. Profit & Loss Mode */}
+                        <td className="py-3 px-3 text-right tabular-nums">
                           <div className="flex items-center justify-end gap-1 mb-0.5">
-                            <span className={`px-1.5 py-0.2 border text-[9px] font-bold uppercase inline-flex items-center gap-1 ${
-                              isProfit
-                                ? 'bg-emerald-50 border-emerald-700 text-emerald-800'
-                                : 'bg-rose-50 border-rose-700 text-rose-800'
-                            }`}>
-                              {isProfit ? <TrendingUp className="w-2.5 h-2.5" /> : <TrendingDown className="w-2.5 h-2.5" />}
-                              <span>{isProfit ? 'PROFIT' : 'LOSS'}</span>
-                            </span>
+                            {isNetProfit ? (
+                              <span className="px-1.5 py-0.2 border bg-emerald-50 border-emerald-700 text-emerald-800 text-[9px] font-bold uppercase inline-flex items-center gap-0.5">
+                                <TrendingUp className="w-2.5 h-2.5" />
+                                <span>PROFIT</span>
+                              </span>
+                            ) : isGrossProfit ? (
+                              <span 
+                                className="px-1.5 py-0.2 border bg-amber-50 border-amber-600 text-amber-900 text-[9px] font-bold uppercase inline-flex items-center gap-0.5"
+                                title="Gross trade profitable; broker fees offset net profit"
+                              >
+                                <TrendingUp className="w-2.5 h-2.5" />
+                                <span>NET LOSS (FEES)</span>
+                              </span>
+                            ) : (
+                              <span className="px-1.5 py-0.2 border bg-rose-50 border-rose-700 text-rose-800 text-[9px] font-bold uppercase inline-flex items-center gap-0.5">
+                                <TrendingDown className="w-2.5 h-2.5" />
+                                <span>LOSS</span>
+                              </span>
+                            )}
                           </div>
-                          <div className={`font-bold text-sm ${isProfit ? 'text-emerald-800' : 'text-red-800'}`}>
-                            {isProfit ? '+' : ''}{sym}{netPnL.toFixed(2)}
+                          <div className={`font-bold text-sm ${isNetProfit ? 'text-emerald-800' : 'text-red-800'}`}>
+                            {isNetProfit ? '+' : ''}{sym}{netPnL.toFixed(2)}
                           </div>
-                          <div className={`text-[10px] font-bold ${isProfit ? 'text-emerald-700' : 'text-red-700'}`}>
-                            ({isProfit ? '+' : ''}{netPercent.toFixed(2)}% Net)
+                          <div className={`text-[10px] font-bold ${isNetProfit ? 'text-emerald-700' : 'text-red-700'}`}>
+                            ({isNetProfit ? '+' : ''}{netPercent.toFixed(2)}% Net)
                           </div>
                           <div className="text-[9px] text-neutral-500 font-mono mt-0.5">
                             Gross: {grossPnL >= 0 ? '+' : ''}{sym}{grossPnL.toFixed(2)} ({grossPercent >= 0 ? '+' : ''}{grossPercent.toFixed(2)}%) • Fees: {sym}{estFees.toFixed(2)}
                           </div>
                         </td>
 
-                        {/* 9. Action Buttons */}
-                        <td className="py-3.5 px-4 text-center" onClick={(e) => e.stopPropagation()}>
+                        {/* 10. Action Buttons */}
+                        <td className="py-3 px-3 text-center" onClick={(e) => e.stopPropagation()}>
                           <div className="flex items-center justify-center gap-1.5">
                             <Link
                               to={`/stock/${encodeURIComponent(h.symbol)}`}

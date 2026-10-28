@@ -103,10 +103,11 @@ export default function TradingPerformance({
 
       const acct = computeFloatingPositionAccounting({
         avgBuyPrice: h.avgBuyPrice,
+        livePrice,
         quantity: h.quantity,
         market: exchange,
         totalCost: cost,
-      }, livePrice);
+      });
 
       const currentVal = Number(h.quantity * livePrice);
       const uPnL = acct.floatingNetPnL;

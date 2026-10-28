@@ -9,7 +9,7 @@
  */
 
 import { STOCK_DIRECTORY, runtimePriceStore, fetchSingleYahooQuote } from './yahooFinance.js';
-import { getQuoteSync as getOmniQuote, subscribeToMarketStream } from './omniFeed.js';
+import { getQuoteSync as getOmniQuote, subscribeToMarketStream, broadcastQuoteUpdates } from './omniFeed.js';
 import { synthesizeCandlesticks } from './microstructureEngine.js';
 import { saveCandlesCache, getCandlesCache } from './localDb.js';
 
@@ -205,6 +205,7 @@ class BrowserMarketServer {
     this.memoryQuotes.set(upper, merged);
     runtimePriceStore.set(upper, merged);
     this._notifySubscribers(upper, merged);
+    broadcastQuoteUpdates({ [upper]: merged }, 'Normalized Exchange Feed');
   }
 
   _notifySubscribers(symbol, quote) {

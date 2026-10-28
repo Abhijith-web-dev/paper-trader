@@ -121,17 +121,35 @@ export function computeRealizedTradeAccounting({
  * Formula:
  * floatingGrossPnL = (latestValidMark - avgCostBasis) * remainingQuantity
  * floatingNetPnL = floatingGrossPnL - allocatedEntryCosts
+ *
+ * Guarantees:
+ * 1. Direction labels (isAboveEntry, isBelowEntry, isAtEntry) strictly follow
+ *    mark price vs entry price (avgBuyPrice).
+ * 2. Gross P&L, Net P&L, Fees, and Return Percentages derive from the exact same
+ *    entry price, mark price, and share count.
+ * 3. Supports both { livePrice } in params and optional second argument (params, maybeLivePrice).
  */
-export function computeFloatingPositionAccounting({
-  avgBuyPrice = 0,
-  livePrice = 0,
-  quantity = 1,
-  market = 'IN',
-  quoteTimestamp = null,
-  isFresh = true,
-}) {
+export function computeFloatingPositionAccounting(
+  params = {},
+  maybeLivePrice = undefined
+) {
+  const {
+    avgBuyPrice = 0,
+    livePrice: paramLivePrice,
+    quantity = 1,
+    market = 'IN',
+    quoteTimestamp = null,
+    isFresh = true,
+    stopLossPrice = null,
+  } = params || {};
+
+  // Support both object property and 2nd parameter
+  const resolvedLivePrice = maybeLivePrice !== undefined
+    ? maybeLivePrice
+    : (paramLivePrice !== undefined ? paramLivePrice : avgBuyPrice);
+
   const costBasisPrice = Math.max(0, Number(avgBuyPrice) || 0);
-  const mark = Math.max(0, Number(livePrice) || costBasisPrice);
+  const mark = Math.max(0, Number(resolvedLivePrice) || costBasisPrice);
   const qty = Math.max(1, Number(quantity) || 1);
 
   const totalCost = Number((costBasisPrice * qty).toFixed(2));
@@ -140,8 +158,23 @@ export function computeFloatingPositionAccounting({
 
   const floatingGrossPnL = Number((currentMarketValue - totalCost).toFixed(2));
   const floatingNetPnL = Number((floatingGrossPnL - entryCharges).toFixed(2));
+  const perShareGrossPnL = Number((mark - costBasisPrice).toFixed(2));
+
   const grossReturnPercent = totalCost > 0 ? Number((((mark - costBasisPrice) / costBasisPrice) * 100).toFixed(2)) : 0;
   const netReturnPercent = totalCost > 0 ? Number(((floatingNetPnL / totalCost) * 100).toFixed(2)) : 0;
+
+  // Strict Direction vs Entry Price
+  const priceDiff = mark - costBasisPrice;
+  const isAboveEntry = priceDiff > 0.005;
+  const isBelowEntry = priceDiff < -0.005;
+  const isAtEntry = !isAboveEntry && !isBelowEntry;
+
+  // Stop-Loss Risk Assessment
+  // If no explicit stop is provided, default to a standard 5% protective stop
+  const effectiveStopLoss = Number(stopLossPrice || (costBasisPrice * 0.95).toFixed(2));
+  const perShareRiskAtStop = Math.max(0, Number((mark - effectiveStopLoss).toFixed(2)));
+  const totalRiskAtStop = Number((perShareRiskAtStop * qty).toFixed(2));
+  const distanceToStopPct = mark > 0 ? Number((((mark - effectiveStopLoss) / mark) * 100).toFixed(2)) : 0;
 
   return {
     avgBuyPrice: costBasisPrice,
@@ -152,12 +185,123 @@ export function computeFloatingPositionAccounting({
     allocatedEntryCharges: entryCharges,
     floatingGrossPnL,
     floatingNetPnL,
+    perShareGrossPnL,
     grossReturnPercent,
     netReturnPercent,
     returnPercent: grossReturnPercent,
+    isAboveEntry,
+    isBelowEntry,
+    isAtEntry,
+    isGrossProfitable: floatingGrossPnL >= 0,
     isProfitable: floatingNetPnL >= 0,
+    effectiveStopLoss,
+    perShareRiskAtStop,
+    totalRiskAtStop,
+    distanceToStopPct,
     quoteTimestamp: quoteTimestamp || Date.now(),
     isFresh,
+  };
+}
+
+/**
+ * Calculates aggregated portfolio stop-loss risk across all positions
+ * Grouped by total value at risk, sector risk, and currency risk.
+ */
+export function calculatePortfolioStopLossRisk(holdingsList = [], livePrices = {}, usdToInrRate = 86.5) {
+  if (!Array.isArray(holdingsList) || holdingsList.length === 0) {
+    return {
+      totalStopRiskINR: 0,
+      totalInrStopRisk: 0,
+      totalUsdStopRisk: 0,
+      totalEquityINR: 0,
+      portfolioRiskPercent: 0,
+      sectorStopRisks: [],
+      positionStopRisks: [],
+    };
+  }
+
+  let totalStopRiskINR = 0;
+  let totalInrStopRisk = 0;
+  let totalUsdStopRisk = 0;
+  let totalEquityINR = 0;
+
+  const sectorMap = {};
+  const positionStopRisks = [];
+
+  holdingsList.forEach((h) => {
+    const isIndia = h.market === 'NSE' || h.currency === 'INR' || h.symbol?.endsWith('.NS') || h.symbol?.endsWith('.BO');
+    const livePrice = Number(livePrices[h.symbol]?.price || h.avgBuyPrice || 100);
+    const cost = Number(h.totalCost || (h.quantity * h.avgBuyPrice));
+    const currentVal = Number(h.quantity * livePrice);
+    const convertedValINR = isIndia ? currentVal : currentVal * usdToInrRate;
+
+    totalEquityINR += convertedValINR;
+
+    const acct = computeFloatingPositionAccounting({
+      avgBuyPrice: h.avgBuyPrice,
+      livePrice,
+      quantity: h.quantity,
+      market: isIndia ? 'IN' : 'US',
+      stopLossPrice: h.stopLossPrice,
+    });
+
+    const positionRiskNative = acct.totalRiskAtStop;
+    const positionRiskINR = isIndia ? positionRiskNative : positionRiskNative * usdToInrRate;
+
+    totalStopRiskINR += positionRiskINR;
+    if (isIndia) {
+      totalInrStopRisk += positionRiskNative;
+    } else {
+      totalUsdStopRisk += positionRiskNative;
+    }
+
+    const sector = h.sector || 'Equities';
+    sectorMap[sector] = (sectorMap[sector] || 0) + positionRiskINR;
+
+    positionStopRisks.push({
+      symbol: h.symbol,
+      name: h.name || h.symbol,
+      sector,
+      isIndia,
+      currency: isIndia ? 'INR' : 'USD',
+      currencySymbol: isIndia ? '₹' : '$',
+      quantity: h.quantity,
+      avgBuyPrice: h.avgBuyPrice,
+      currentPrice: livePrice,
+      currentVal,
+      stopLossPrice: acct.effectiveStopLoss,
+      perShareRisk: acct.perShareRiskAtStop,
+      positionRiskNative,
+      positionRiskINR,
+      distanceToStopPct: acct.distanceToStopPct,
+      percentOfTotalRisk: 0, // Calculated after totalStopRiskINR is known
+    });
+  });
+
+  // Calculate percentage contributions
+  positionStopRisks.forEach((p) => {
+    p.percentOfTotalRisk = totalStopRiskINR > 0 ? Number(((p.positionRiskINR / totalStopRiskINR) * 100).toFixed(1)) : 0;
+  });
+
+  const sectorStopRisks = Object.entries(sectorMap)
+    .map(([name, riskINR]) => ({
+      name,
+      riskINR: Number(riskINR.toFixed(2)),
+      percentOfRisk: totalStopRiskINR > 0 ? Number(((riskINR / totalStopRiskINR) * 100).toFixed(1)) : 0,
+      percentOfEquity: totalEquityINR > 0 ? Number(((riskINR / totalEquityINR) * 100).toFixed(2)) : 0,
+    }))
+    .sort((a, b) => b.riskINR - a.riskINR);
+
+  const portfolioRiskPercent = totalEquityINR > 0 ? Number(((totalStopRiskINR / totalEquityINR) * 100).toFixed(2)) : 0;
+
+  return {
+    totalStopRiskINR: Number(totalStopRiskINR.toFixed(2)),
+    totalInrStopRisk: Number(totalInrStopRisk.toFixed(2)),
+    totalUsdStopRisk: Number(totalUsdStopRisk.toFixed(2)),
+    totalEquityINR: Number(totalEquityINR.toFixed(2)),
+    portfolioRiskPercent,
+    sectorStopRisks,
+    positionStopRisks: positionStopRisks.sort((a, b) => b.positionRiskINR - a.positionRiskINR),
   };
 }
 

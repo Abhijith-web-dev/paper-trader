@@ -15,6 +15,7 @@ import {
   computeFloatingPositionAccounting,
   calculateJournalMetrics,
   createEmptyMetricsState,
+  calculatePortfolioStopLossRisk,
 } from '../src/lib/journalAnalytics.js';
 
 console.log('🧪 Starting Journal Analytics & Accounting Regression Test Suite...');
@@ -252,4 +253,66 @@ console.log('  Testing Closed Trade Metrics & User Reviews...');
 }
 console.log('  ✅ Closed trade metrics & user reviews passed.');
 
-console.log('\n🎉 ALL JOURNAL ANALYTICS TESTS PASSED SUCCESSFULLY! (5/5 suites)');
+// =========================================================================
+// TEST 6: Exact Mark-to-Market Invariants & Stop-Loss Portfolio Risk (User Feedback)
+// =========================================================================
+console.log('  Testing Exact MTM Direction Labels, Non-zero Gross P&L & Stop-Loss Risk...');
+{
+  // 6.1 RELIANCE NSE Case: avgBuyPrice ₹1,196.00, livePrice ₹1,196.20, 10 shares
+  const rel = computeFloatingPositionAccounting({
+    avgBuyPrice: 1196.00,
+    livePrice: 1196.20,
+    quantity: 10,
+    market: 'NSE',
+    stopLossPrice: 1150.00,
+  });
+
+  assert.equal(rel.isAboveEntry, true, 'RELIANCE (1196.20 vs 1196.00) MUST be Above Entry');
+  assert.equal(rel.isBelowEntry, false);
+  assert.equal(rel.floatingGrossPnL, 2.00, 'Gross P&L MUST be exactly +₹2.00 (not 0!)');
+  assert.equal(rel.perShareGrossPnL, 0.20);
+  assert.equal(rel.effectiveStopLoss, 1150.00);
+  assert.equal(rel.totalRiskAtStop, 462.00); // (1196.20 - 1150.00) * 10 = 46.20 * 10 = 462.00
+
+  // 6.2 GOLDSTAR Case: avgBuyPrice ₹9.15, livePrice ₹9.75, 100 shares
+  const gold = computeFloatingPositionAccounting({
+    avgBuyPrice: 9.15,
+    livePrice: 9.75,
+    quantity: 100,
+    market: 'NSE',
+  });
+  assert.equal(gold.isAboveEntry, true, 'GOLDSTAR (9.75 vs 9.15) MUST be Above Entry');
+  assert.equal(gold.floatingGrossPnL, 60.00, 'Gross P&L MUST be exactly +₹60.00');
+
+  // 6.3 MSFT US Case: 9 shares, cost $4,720.59 ($524.51 avg), livePrice $531.33 ($4,781.97 val)
+  const msft = computeFloatingPositionAccounting({
+    avgBuyPrice: 524.51,
+    livePrice: 531.33,
+    quantity: 9,
+    market: 'US',
+    totalCost: 4720.59,
+  });
+  assert.equal(msft.currentMarketValue, 4781.97);
+  assert.equal(msft.floatingGrossPnL, 61.38, 'MSFT Gross P&L MUST be +$61.38 (never $0!)');
+  assert.equal(msft.isAboveEntry, true, 'MSFT MUST be Above Entry');
+
+  // 6.4 Portfolio Stop-Loss Risk Aggregation
+  const testHoldings = [
+    { symbol: 'RELIANCE.NS', name: 'Reliance Industries', market: 'NSE', currency: 'INR', quantity: 10, avgBuyPrice: 1196.00, stopLossPrice: 1150.00, sector: 'Energy' },
+    { symbol: 'MSFT', name: 'Microsoft Corporation', market: 'US', currency: 'USD', quantity: 9, avgBuyPrice: 524.51, stopLossPrice: 500.00, sector: 'Technology' },
+  ];
+  const testPrices = {
+    'RELIANCE.NS': { price: 1196.20, timestamp: Date.now() },
+    'MSFT': { price: 531.33, timestamp: Date.now() },
+  };
+
+  const riskAssessment = calculatePortfolioStopLossRisk(testHoldings, testPrices, 86.5);
+  assert.ok(riskAssessment.totalStopRiskINR > 0, 'Total stop risk must be positive');
+  assert.equal(riskAssessment.totalInrStopRisk, 462.00);
+  assert.equal(riskAssessment.totalUsdStopRisk, Number(((531.33 - 500.00) * 9).toFixed(2))); // 281.97
+  assert.equal(riskAssessment.sectorStopRisks.length, 2);
+  assert.equal(riskAssessment.positionStopRisks.length, 2);
+}
+console.log('  ✅ Exact MTM Direction Labels, Non-zero Gross P&L & Stop-Loss Risk passed.');
+
+console.log('\n🎉 ALL JOURNAL ANALYTICS TESTS PASSED SUCCESSFULLY! (6/6 suites)');
