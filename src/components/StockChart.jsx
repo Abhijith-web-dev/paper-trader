@@ -73,6 +73,12 @@ export default function StockChart({
   const bbLowerSeriesRef = useRef(null);
   const candlesRef = useRef([]);
 
+  // Stable reference for onQuoteSync to prevent re-fetch and render loops
+  const onQuoteSyncRef = useRef(onQuoteSync);
+  useEffect(() => {
+    onQuoteSyncRef.current = onQuoteSync;
+  }, [onQuoteSync]);
+
   // Fullscreen State
   const [isFullscreen, setIsFullscreen] = useState(false);
 
@@ -255,8 +261,8 @@ export default function StockChart({
               source: 'normalized_exchange_feed',
             };
             setQuoteData(synQuote);
-            if (onQuoteSync) {
-              onQuoteSync(synQuote);
+            if (onQuoteSyncRef.current) {
+              onQuoteSyncRef.current(synQuote);
             }
 
             // Invariant: during active open session, last candle reflects normalized current price
@@ -282,7 +288,7 @@ export default function StockChart({
     return () => {
       isMounted = false;
     };
-  }, [symbol, timeframe, isIntraday, onQuoteSync]);
+  }, [symbol, timeframe, isIntraday]);
 
   // 2. Subscribe to real-time price stream from OmniFeed
   useEffect(() => {
@@ -293,7 +299,7 @@ export default function StockChart({
         setQuoteData((prev) => {
           const updatedHigh = Math.max(prev?.high || newPrice, newPrice);
           const updatedLow = Math.min(prev?.low || newPrice, newPrice);
-          const updated = {
+          return {
             ...prev,
             ...live,
             price: newPrice,
@@ -301,10 +307,6 @@ export default function StockChart({
             low: updatedLow,
             timestamp: live.timestamp || Date.now(),
           };
-          if (onQuoteSync) {
-            onQuoteSync(updated);
-          }
-          return updated;
         });
 
         // Only update active ongoing candle on the chart during active open market sessions
@@ -336,7 +338,7 @@ export default function StockChart({
     });
 
     return () => unsubscribe();
-  }, [symbol, chartType, onQuoteSync, isMarketClosed]);
+  }, [symbol, chartType, isMarketClosed]);
 
   // 3. Initialize & Build Lightweight Charts Canvas Instance
   useEffect(() => {

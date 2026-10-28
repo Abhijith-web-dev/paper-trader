@@ -63,12 +63,29 @@ class ErrorBoundary extends Component {
             <div className="p-3 bg-red-50 border border-red-800 text-red-950 text-left text-[11px] overflow-auto max-h-28 break-words font-mono">
               {this.state.error?.message || 'Display exception caught'}
             </div>
-            <div className="flex gap-2 justify-center pt-2">
+            <div className="flex flex-wrap gap-2 justify-center pt-2">
               <button
                 onClick={() => window.location.reload()}
                 className="px-4 py-2 bg-[#111111] text-[#F6F4EE] font-bold text-xs hover:bg-neutral-800 transition-colors cursor-pointer"
               >
                 Reload Terminal
+              </button>
+              <button
+                onClick={() => {
+                  try {
+                    sessionStorage.clear();
+                    Object.keys(localStorage).forEach((k) => {
+                      if (k.startsWith('chart_') || k.startsWith('candles_') || k.startsWith('omnifeed_')) {
+                        localStorage.removeItem(k);
+                      }
+                    });
+                  } catch {}
+                  this.setState({ hasError: false, error: null });
+                  window.location.href = '/dashboard';
+                }}
+                className="px-4 py-2 bg-[#FAF8F3] border-2 border-amber-900 text-amber-950 font-bold text-xs hover:bg-amber-100 transition-colors cursor-pointer"
+              >
+                Safe Reset & Recover
               </button>
               <button
                 onClick={() => {

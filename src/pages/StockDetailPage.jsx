@@ -9,6 +9,7 @@ import { getQuoteFreshness } from '../lib/quoteFreshness';
 import { isMarketOpenForSymbol } from '../lib/marketHours';
 import MarketStatusBadge from '../components/MarketStatusBadge';
 import StockChart from '../components/StockChart';
+import WidgetErrorBoundary from '../components/WidgetErrorBoundary';
 import HoldingSparkline from '../components/HoldingSparkline';
 import { 
   TrendingUp, 
@@ -130,12 +131,21 @@ export default function StockDetailPage() {
   // Synchronize normalized quote from the chart canvas
   const handleQuoteSyncFromChart = useCallback((syncedQuote) => {
     if (!syncedQuote || !syncedQuote.price) return;
-    setQuote((prev) => ({
-      ...prev,
-      ...syncedQuote,
-      name: prev?.name || stockInfo.name,
-      market: prev?.market || stockInfo.market,
-    }));
+    setQuote((prev) => {
+      if (
+        prev?.price === syncedQuote.price &&
+        prev?.high === syncedQuote.high &&
+        prev?.low === syncedQuote.low
+      ) {
+        return prev;
+      }
+      return {
+        ...prev,
+        ...syncedQuote,
+        name: prev?.name || stockInfo.name,
+        market: prev?.market || stockInfo.market,
+      };
+    });
     browserMarketServer.updateQuote(symbol, syncedQuote);
   }, [symbol, stockInfo]);
 
@@ -340,16 +350,18 @@ export default function StockDetailPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Column (2 cols): Interactive Candlestick Chart */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Candlestick Chart Container */}
+          {/* Candlestick Chart Container with Isolated Safeguard */}
           <div className="newspaper-photo-plate p-1 bg-white overflow-hidden">
-            <StockChart 
-              symbol={symbol} 
-              currencySymbol={currencySymbol} 
-              livePrice={quote?.price}
-              onQuoteSync={handleQuoteSyncFromChart}
-              activeIndicators={activeIndicators} 
-              onToggleIndicator={toggleIndicator} 
-            />
+            <WidgetErrorBoundary title="Interactive Candlestick Chart">
+              <StockChart 
+                symbol={symbol} 
+                currencySymbol={currencySymbol} 
+                livePrice={quote?.price}
+                onQuoteSync={handleQuoteSyncFromChart}
+                activeIndicators={activeIndicators} 
+                onToggleIndicator={toggleIndicator} 
+              />
+            </WidgetErrorBoundary>
           </div>
 
           {/* Fundamentals & Technical Metrics Card */}

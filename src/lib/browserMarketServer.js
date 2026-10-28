@@ -9,7 +9,7 @@
  */
 
 import { STOCK_DIRECTORY, runtimePriceStore, fetchSingleYahooQuote } from './yahooFinance.js';
-import { getQuoteSync as getOmniQuote, subscribeToMarketStream, broadcastQuoteUpdates } from './omniFeed.js';
+import { getQuoteSync as getOmniQuote, subscribeToMarketStream } from './omniFeed.js';
 import { synthesizeCandlesticks } from './microstructureEngine.js';
 import { saveCandlesCache, getCandlesCache } from './localDb.js';
 
@@ -190,12 +190,24 @@ class BrowserMarketServer {
   }
 
   /**
-   * Synchronize and broadcast a normalized exchange quote to all listeners
+   * Synchronize a normalized exchange quote to internal cache and local subscribers.
+   * Guarded with an idempotency check to eliminate cyclical re-render loops.
    */
   updateQuote(symbol, quoteUpdate) {
     if (!symbol || !quoteUpdate) return;
     const upper = symbol.toUpperCase();
     const existing = this.getQuoteSync(upper) || {};
+
+    // Guard against redundant duplicate notifications
+    if (
+      existing.price === quoteUpdate.price &&
+      existing.timestamp === quoteUpdate.timestamp &&
+      existing.high === quoteUpdate.high &&
+      existing.low === quoteUpdate.low
+    ) {
+      return;
+    }
+
     const merged = {
       ...existing,
       ...quoteUpdate,
@@ -205,7 +217,6 @@ class BrowserMarketServer {
     this.memoryQuotes.set(upper, merged);
     runtimePriceStore.set(upper, merged);
     this._notifySubscribers(upper, merged);
-    broadcastQuoteUpdates({ [upper]: merged }, 'Normalized Exchange Feed');
   }
 
   _notifySubscribers(symbol, quote) {

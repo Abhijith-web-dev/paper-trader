@@ -349,21 +349,28 @@ export default function DashboardPage() {
   };
 
   // Active Featured Benchmark Leaders
-  const featuredLeaders = activeTab === 'NSE'
-    ? BENCHMARK_LEADERS.NSE
-    : activeTab === 'US'
-      ? BENCHMARK_LEADERS.US
-      : [...BENCHMARK_LEADERS.NSE.slice(0, 3), ...BENCHMARK_LEADERS.US.slice(0, 3)];
+  const featuredLeaders = useMemo(() => {
+    return activeTab === 'NSE'
+      ? BENCHMARK_LEADERS.NSE
+      : activeTab === 'US'
+        ? BENCHMARK_LEADERS.US
+        : [...BENCHMARK_LEADERS.NSE.slice(0, 3), ...BENCHMARK_LEADERS.US.slice(0, 3)];
+  }, [activeTab]);
 
   // User's Watchlisted symbols (Local-First + Dexie synced)
-  const nseWatchlist = userProfile?.watchlist?.NSE || ['RELIANCE.NS', 'TCS.NS', 'HDFCBANK.NS', 'INFY.NS', 'TATAMOTORS.NS'];
-  const usWatchlist = userProfile?.watchlist?.US || ['AAPL', 'NVDA', 'TSLA', 'MSFT', 'AMZN'];
+  const nseWatchlist = useMemo(() => {
+    return userProfile?.watchlist?.NSE || ['RELIANCE.NS', 'TCS.NS', 'HDFCBANK.NS', 'INFY.NS', 'TATAMOTORS.NS'];
+  }, [userProfile?.watchlist?.NSE]);
 
-  const displayedWatchlistSymbols = activeTab === 'NSE'
-    ? nseWatchlist
-    : activeTab === 'US'
-      ? usWatchlist
-      : Array.from(new Set([...nseWatchlist, ...usWatchlist]));
+  const usWatchlist = useMemo(() => {
+    return userProfile?.watchlist?.US || ['AAPL', 'NVDA', 'TSLA', 'MSFT', 'AMZN'];
+  }, [userProfile?.watchlist?.US]);
+
+  const displayedWatchlistSymbols = useMemo(() => {
+    if (activeTab === 'NSE') return nseWatchlist;
+    if (activeTab === 'US') return usWatchlist;
+    return Array.from(new Set([...nseWatchlist, ...usWatchlist]));
+  }, [activeTab, nseWatchlist, usWatchlist]);
 
   // Resolve metadata for any symbol
   const resolveStockMeta = (sym) => {
@@ -419,17 +426,42 @@ export default function DashboardPage() {
     };
   }, [searchQuery, activeTab]);
 
-  // Fetch missing quotes for any displayed watchlist stocks
+  // Guarded fetch for missing quotes for displayed watchlist stocks
+  const inFlightQuotesRef = useRef(new Set());
   useEffect(() => {
-    displayedWatchlistSymbols.forEach(async (sym) => {
-      if (!livePrices[sym]) {
-        const q = await fetchLiveQuoteAnyStock(sym);
-        if (q) {
-          setLivePrices((prev) => ({ ...prev, [sym]: q }));
+    const missing = displayedWatchlistSymbols.filter((sym) => !livePrices[sym] && !inFlightQuotesRef.current.has(sym));
+    if (missing.length === 0) return;
+
+    missing.forEach((sym) => inFlightQuotesRef.current.add(sym));
+
+    let isSubscribed = true;
+    Promise.all(
+      missing.map(async (sym) => {
+        try {
+          const q = await fetchLiveQuoteAnyStock(sym);
+          return q ? [sym, q] : null;
+        } catch {
+          return null;
         }
+      })
+    ).then((results) => {
+      if (!isSubscribed) return;
+      const valid = results.filter(Boolean);
+      if (valid.length > 0) {
+        setLivePrices((prev) => {
+          const next = { ...prev };
+          valid.forEach(([sym, q]) => {
+            next[sym] = q;
+          });
+          return next;
+        });
       }
     });
-  }, [displayedWatchlistSymbols]);
+
+    return () => {
+      isSubscribed = false;
+    };
+  }, [displayedWatchlistSymbols, livePrices]);
 
   // Handle Watchlist Star Toggle with Toast
   const handleWatchlistToggle = async (e, symbol, market, category) => {
