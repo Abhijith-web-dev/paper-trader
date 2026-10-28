@@ -83,9 +83,9 @@ export default function StockChart({
   const [isFullscreen, setIsFullscreen] = useState(false);
 
   // Chart Configuration State
-  const [timeframe, setTimeframe] = useState('1m'); // Default to 1m intraday per-minute view
-  const isIntraday = ['1m', '3m', '5m', '1D', '1W'].includes(timeframe);
-  const [windowMeta, setWindowMeta] = useState(() => getTimeframeWindowDescription('1m'));
+  const [timeframe, setTimeframe] = useState('1D'); // Always open in 1D
+  const isIntraday = ['1D', '1W'].includes(timeframe);
+  const [windowMeta, setWindowMeta] = useState(() => getTimeframeWindowDescription('1D'));
   const [chartType, setChartType] = useState('candles'); // 'candles' | 'area'
   const [candles, setCandles] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -396,9 +396,9 @@ export default function StockChart({
         borderColor: '#1C1917',
         timeVisible: isIntraday,
         secondsVisible: false,
-        barSpacing: ['1m', '3m', '5m'].includes(timeframe) ? 13 : 8,
-        minBarSpacing: 5,
-        rightOffset: ['1m', '3m', '5m'].includes(timeframe) ? 6 : 2,
+        barSpacing: timeframe === '1D' ? 12 : 8,
+        minBarSpacing: 4,
+        rightOffset: 4,
         tickMarkFormatter: (time) => {
           if (typeof time === 'number') {
             return formatExchangeLocalTime(time, tzMeta, 'tick');
@@ -751,33 +751,23 @@ export default function StockChart({
         {/* Timeframe Selector */}
         <div className="flex items-center gap-1 flex-wrap">
           {[
-            { id: '1m', label: '1m', badge: '60m', title: '1-Minute Candles (Respective Last 60 Minutes)' },
-            { id: '3m', label: '3m', badge: '3h', title: '3-Minute Candles (Respective Last 180 Minutes / 3 Hours)' },
-            { id: '5m', label: '5m', badge: '5h', title: '5-Minute Candles (Respective Last 300 Minutes / 5 Hours)' },
-            { id: '1D', label: '1D', badge: 'Day', title: 'Full Regular Trading Session (5-Minute Bars)' },
-            { id: '1W', label: '1W', badge: '5D', title: '1-Week Hourly Overview' },
-            { id: '1M', label: '1M', badge: '1M', title: '1-Month Daily Overview' },
-            { id: '3M', label: '3M', badge: '3M', title: '3-Month Daily Overview' },
-            { id: '1Y', label: '1Y', badge: '1Y', title: '1-Year Daily Overview' },
+            { id: '1D', label: '1D', title: '1-Day Full Trading Session (5-Minute Intraday Bars)' },
+            { id: '1W', label: '1W', title: '1-Week Hourly Overview' },
+            { id: '1M', label: '1M', title: '1-Month Daily Overview' },
+            { id: '3M', label: '3M', title: '3-Month Daily Overview' },
+            { id: '1Y', label: '1Y', title: '1-Year Daily Overview' },
           ].map((btn) => (
             <button
               key={btn.id}
               onClick={() => setTimeframe(btn.id)}
               title={btn.title}
-              className={`px-2 py-0.5 font-mono text-[11px] font-bold border transition-colors flex items-center gap-1 cursor-pointer ${
+              className={`px-2.5 py-0.5 font-mono text-[11px] font-bold border transition-colors flex items-center gap-1 cursor-pointer ${
                 timeframe === btn.id
                   ? 'bg-[#111111] text-white border-[#111111]'
                   : 'bg-[#FAF8F3] text-stone-700 border-stone-300 hover:bg-stone-100'
               }`}
             >
               <span>{btn.label}</span>
-              {['1m', '3m', '5m'].includes(btn.id) && (
-                <span className={`text-[9px] px-1 py-0.2 rounded-xs font-semibold ${
-                  timeframe === btn.id ? 'bg-stone-700 text-amber-300' : 'bg-stone-200 text-stone-600'
-                }`}>
-                  {btn.badge}
-                </span>
-              )}
             </button>
           ))}
         </div>
@@ -1011,7 +1001,7 @@ export default function StockChart({
           </span>
           <span className="hidden sm:inline text-stone-300">|</span>
           <span className="hidden sm:inline text-stone-500 font-mono">
-            EXCHANGE: {tzMeta.marketName} • TZ: {tzMeta.label} • TICK TIMEFRAME: {timeframe} ({windowMeta?.window || 'Last 60m'})
+            EXCHANGE: {tzMeta.marketName} • TZ: {tzMeta.label} • TIMEFRAME: {timeframe} ({windowMeta?.window || 'Session'})
           </span>
         </div>
         <div className="flex items-center gap-2 text-stone-500 font-mono">
