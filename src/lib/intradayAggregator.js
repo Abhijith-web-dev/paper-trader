@@ -11,6 +11,10 @@
  * 3. Session alignment anchored to exchange session open (e.g. 09:15 for NSE, 09:30 for US).
  * 4. Invariant validation: low <= min(open, close), high >= max(open, close), volume >= 0.
  * 5. Exchange-local timezone formatting (IST for NSE, EDT/EST for US).
+ * 6. Slicing to respective last current minutes windows:
+ *    - '1m': last 60 minutes (60 1m bars up to current tick)
+ *    - '3m': last 180 minutes / 3 hours (60 3m bars up to current tick)
+ *    - '5m': last 300 minutes / 5 hours (60 5m bars up to current tick)
  */
 
 /**
@@ -308,4 +312,113 @@ export function harmonizeSessionBounds(candles, currentPrice, dayHigh, dayLow) {
     candleLow: cLow,
     isConsistent: resolvedDayHigh >= resolvedDayLow,
   };
+}
+
+/**
+ * Slice intraday candles to the respective last current minutes window:
+ * - '1m': last 60 bars (last 60 minutes of trading up to latest tick)
+ * - '3m': last 60 bars (last 180 minutes / 3 hours of trading up to latest tick)
+ * - '5m': last 60 bars (last 300 minutes / 5 hours of trading up to latest tick)
+ * - '1D' or macro: preserves all bars (full session or macro history)
+ * 
+ * @param {Array} candles - Array of OHLCV candles
+ * @param {string} timeframe - '1m' | '3m' | '5m' | '1D' | ...
+ * @param {number} maxBars - Default 60
+ * @returns {Array} Sliced candles
+ */
+export function sliceRecentIntradayCandles(candles, timeframe = '1m', maxBars = 60) {
+  if (!Array.isArray(candles) || candles.length === 0) return [];
+  if (['1m', '3m', '5m'].includes(timeframe)) {
+    return candles.length > maxBars ? candles.slice(-maxBars) : candles;
+  }
+  return candles;
+}
+
+/**
+ * Get readable timeframe window metadata
+ */
+export function getTimeframeWindowDescription(timeframe = '1m') {
+  switch (timeframe) {
+    case '1m':
+      return { 
+        id: '1m',
+        window: 'Last 60m', 
+        fullLabel: 'LAST 60 MINS (1m BARS)', 
+        barDurationMin: 1, 
+        totalSpanMin: 60,
+        tooltip: '1-Minute Candles • Respective Last 60 Minutes' 
+      };
+    case '3m':
+      return { 
+        id: '3m',
+        window: 'Last 3h', 
+        fullLabel: 'LAST 180 MINS (3m BARS)', 
+        barDurationMin: 3, 
+        totalSpanMin: 180,
+        tooltip: '3-Minute Candles • Respective Last 180 Minutes (3 Hours)' 
+      };
+    case '5m':
+      return { 
+        id: '5m',
+        window: 'Last 5h', 
+        fullLabel: 'LAST 300 MINS (5m BARS)', 
+        barDurationMin: 5, 
+        totalSpanMin: 300,
+        tooltip: '5-Minute Candles • Respective Last 300 Minutes (5 Hours)' 
+      };
+    case '1D':
+      return { 
+        id: '1D',
+        window: 'Session', 
+        fullLabel: 'FULL SESSION (5m BARS)', 
+        barDurationMin: 5, 
+        totalSpanMin: 375,
+        tooltip: 'Full Regular Trading Session (5-Minute Bars)' 
+      };
+    case '1W':
+      return { 
+        id: '1W',
+        window: '5 Days', 
+        fullLabel: '1 WEEK (HOURLY)', 
+        barDurationMin: 60, 
+        totalSpanMin: 1800,
+        tooltip: '5-Day Trading Week (Hourly Bars)' 
+      };
+    case '1M':
+      return { 
+        id: '1M',
+        window: '1 Month', 
+        fullLabel: '1 MONTH (DAILY)', 
+        barDurationMin: 1440, 
+        totalSpanMin: 43200,
+        tooltip: '1-Month Calendar Range (Daily Bars)' 
+      };
+    case '3M':
+      return { 
+        id: '3M',
+        window: '3 Months', 
+        fullLabel: '3 MONTHS (DAILY)', 
+        barDurationMin: 1440, 
+        totalSpanMin: 129600,
+        tooltip: '3-Month Calendar Range (Daily Bars)' 
+      };
+    case '1Y':
+      return { 
+        id: '1Y',
+        window: '1 Year', 
+        fullLabel: '1 YEAR (DAILY)', 
+        barDurationMin: 1440, 
+        totalSpanMin: 525600,
+        tooltip: '1-Year 52-Week Range (Daily Bars)' 
+      };
+    default:
+      return { 
+        id: timeframe,
+        window: timeframe, 
+        fullLabel: timeframe, 
+        barDurationMin: 1, 
+        totalSpanMin: 60,
+        tooltip: `${timeframe} Range` 
+      };
+  }
 }

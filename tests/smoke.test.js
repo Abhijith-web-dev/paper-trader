@@ -13,7 +13,9 @@ import {
   aggregateIntradayCandles, 
   getExchangeTimezoneMeta, 
   harmonizeSessionBounds,
-  formatExchangeLocalTime 
+  formatExchangeLocalTime,
+  sliceRecentIntradayCandles,
+  getTimeframeWindowDescription 
 } from '../src/lib/intradayAggregator.js';
 
 console.log('🧪 Starting Automated Smoke Test Suite...');
@@ -426,4 +428,73 @@ console.log('  Testing Zero Fabrication for Intraday Data...');
 }
 console.log('  ✅ Zero Fabrication for Intraday Data passed.');
 
-console.log('\n🎉 ALL SMOKE TESTS PASSED SUCCESSFULLY! (11/11 test suites)');
+// =========================================================================
+// TEST 12: Respective Last Current Minutes Slicing & Window Integrity (1m, 3m, 5m)
+// =========================================================================
+console.log('  Testing Respective Last Current Minutes Slicing & Window Integrity...');
+{
+  const sessionStart = 1793072700; // 09:15:00 IST
+  // Generate 375 1-minute bars spanning a full 6.25 hour day (09:15 to 15:30)
+  const fullDay1mBars = [];
+  for (let i = 0; i < 375; i++) {
+    const t = sessionStart + i * 60;
+    fullDay1mBars.push({
+      time: t,
+      open: 1190 + Math.sin(i / 10) * 5,
+      high: 1195 + Math.sin(i / 10) * 5,
+      low: 1188 + Math.sin(i / 10) * 5,
+      close: 1192 + Math.sin(i / 10) * 5,
+      volume: 1000 + i * 10,
+    });
+  }
+
+  // 12.1 Verify 1m slicing: full 375 bars sliced to respective last 60 minutes
+  const sliced1m = sliceRecentIntradayCandles(fullDay1mBars, '1m', 60);
+  assert.equal(sliced1m.length, 60, '1m view must contain exactly 60 bars (last 60 minutes)');
+  assert.equal(sliced1m[sliced1m.length - 1].time, fullDay1mBars[374].time, 'Last bar must be the latest current session bar');
+  assert.equal(sliced1m[0].time, fullDay1mBars[315].time, 'First bar must be exactly 59 minutes before the last bar');
+  const spanSec1m = sliced1m[sliced1m.length - 1].time - sliced1m[0].time;
+  assert.equal(spanSec1m, 59 * 60, 'Time span must cover exactly 59 intervals = 60 minute bars');
+
+  // 12.2 Verify 3m aggregation and slicing:
+  const agg3m = aggregateIntradayCandles(fullDay1mBars, 3, sessionStart);
+  assert.equal(agg3m.length, 125, '375 1m bars must aggregate to 125 3m bars');
+  const sliced3m = sliceRecentIntradayCandles(agg3m, '3m', 60);
+  assert.equal(sliced3m.length, 60, '3m view must contain exactly 60 bars (last 180 minutes / 3 hours)');
+  assert.equal(sliced3m[sliced3m.length - 1].time, agg3m[124].time, 'Last 3m bar must match latest aggregated bar');
+
+  // 12.3 Verify 5m aggregation and slicing:
+  const agg5m = aggregateIntradayCandles(fullDay1mBars, 5, sessionStart);
+  assert.equal(agg5m.length, 75, '375 1m bars must aggregate to 75 5m bars');
+  const sliced5m = sliceRecentIntradayCandles(agg5m, '5m', 60);
+  assert.equal(sliced5m.length, 60, '5m view must contain exactly 60 bars (last 300 minutes / 5 hours)');
+
+  // 12.4 Verify 1D preserves all session bars without slicing
+  const preserved1D = sliceRecentIntradayCandles(agg5m, '1D', 60);
+  assert.equal(preserved1D.length, 75, '1D timeframe must preserve all session bars (75 bars)');
+
+  // 12.5 Verify Window Description Metadata
+  const desc1m = getTimeframeWindowDescription('1m');
+  assert.equal(desc1m.window, 'Last 60m');
+  assert.equal(desc1m.fullLabel, 'LAST 60 MINS (1m BARS)');
+
+  const desc3m = getTimeframeWindowDescription('3m');
+  assert.equal(desc3m.window, 'Last 3h');
+  assert.equal(desc3m.fullLabel, 'LAST 180 MINS (3m BARS)');
+
+  const desc5m = getTimeframeWindowDescription('5m');
+  assert.equal(desc5m.window, 'Last 5h');
+  assert.equal(desc5m.fullLabel, 'LAST 300 MINS (5m BARS)');
+
+  const desc1D = getTimeframeWindowDescription('1D');
+  assert.equal(desc1D.window, 'Session');
+
+  // 12.6 Verify session extremes are preserved from full day even when sliced
+  // Peak high occurred at bar 50 (middle of the day), well outside the last 60 bars
+  fullDay1mBars[50].high = 1250.0;
+  const bounds = harmonizeSessionBounds(fullDay1mBars, 1192.0, 1250.0, 1180.0);
+  assert.equal(bounds.dayHigh, 1250.0, 'Session dayHigh must preserve daytime peak even when display candles are windowed');
+}
+console.log('  ✅ Respective Last Current Minutes Slicing & Window Integrity passed.');
+
+console.log('\n🎉 ALL SMOKE TESTS PASSED SUCCESSFULLY! (12/12 test suites)');

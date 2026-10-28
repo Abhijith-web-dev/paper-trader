@@ -65,7 +65,10 @@ export function synthesizeCandlesticks(symbol, metrics, timeframe = '1D') {
     } else if (tf === '3m') {
       barCount = 60; // 60 3-minute bars (3 hours view)
       stepSec = 180;
-    } else if (tf === '5m' || tf === '1D') {
+    } else if (tf === '5m') {
+      barCount = 60; // 60 5-minute bars (5 hours view)
+      stepSec = 300;
+    } else if (tf === '1D') {
       barCount = 75; // 75 5-minute bars (full 6.25-hour exchange session)
       stepSec = 300;
     }

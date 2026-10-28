@@ -5,7 +5,9 @@ import {
   validateCandle, 
   aggregateIntradayCandles, 
   getExchangeTimezoneMeta, 
-  harmonizeSessionBounds 
+  harmonizeSessionBounds,
+  sliceRecentIntradayCandles,
+  getTimeframeWindowDescription
 } from './intradayAggregator.js';
 
 /**
@@ -1045,21 +1047,26 @@ export async function getStockHistoricalCandles(symbol, timeframe = '1D') {
                 runtimePriceStore.set(targetSymbol, normalizedQuote);
               }
 
+              const windowMeta = getTimeframeWindowDescription(tf);
+              const slicedCandles = sliceRecentIntradayCandles(candles, tf, 60);
+
               const finalRes = {
-                candles,
+                candles: slicedCandles,
+                allSessionBarsCount: candles.length,
                 meta,
                 timezone: tzMeta,
                 previousClose: prevClose,
                 dayHigh: sessionBounds.dayHigh,
                 dayLow: sessionBounds.dayLow,
                 currentPrice: rawCurrentPrice,
-                lastCompletedClose: candles[candles.length - 1]?.close,
-                lastBarTime: candles[candles.length - 1]?.time,
+                lastCompletedClose: slicedCandles[slicedCandles.length - 1]?.close,
+                lastBarTime: slicedCandles[slicedCandles.length - 1]?.time,
                 isMarketClosed: !isMarketOpen,
                 change,
                 changePercent,
                 isIntraday,
                 timeframe: tf,
+                windowMeta,
                 timestamp: quoteTimestamp,
                 quote: normalizedQuote,
               };
@@ -1081,12 +1088,14 @@ export async function getStockHistoricalCandles(symbol, timeframe = '1D') {
   // 3. ZERO FABRICATION FOR INTRADAY
   // If provider cannot supply valid intraday data, return clean unavailable state
   if (isIntradayInterval) {
+    const windowMeta = getTimeframeWindowDescription(tf);
     return {
       candles: [],
       isUnavailable: true,
       symbol: upper,
       timeframe: tf,
-      reason: 'Intraday exchange data unavailable for this symbol',
+      windowMeta,
+      reason: `Intraday exchange data unavailable for ${upper} on ${tf}`,
       timezone: defaultTzMeta,
       currentPrice: metrics?.price || 100,
       previousClose: metrics?.previousClose || metrics?.price || 100,
