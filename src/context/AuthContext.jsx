@@ -635,6 +635,7 @@ export function AuthProvider({ children }) {
     const orderId = 'ORD_' + Date.now();
     let updatedCashBalance = wallet.cashBalance;
     let updatedRealizedPnL = wallet.realizedPnL || 0;
+    let tradeRealizedPnL = 0;
 
     if (action === 'BUY') {
       const totalCost = Number((qty * orderPrice).toFixed(2));
@@ -691,7 +692,7 @@ export function AuthProvider({ children }) {
 
       const totalProceeds = Number((qty * orderPrice).toFixed(2));
       const costBasis = Number((qty * existingHolding.avgBuyPrice).toFixed(2));
-      const tradeRealizedPnL = Number((totalProceeds - costBasis).toFixed(2));
+      tradeRealizedPnL = Number((totalProceeds - costBasis).toFixed(2));
 
       updatedCashBalance = Number((wallet.cashBalance + totalProceeds).toFixed(2));
       updatedRealizedPnL = Number((updatedRealizedPnL + tradeRealizedPnL).toFixed(2));

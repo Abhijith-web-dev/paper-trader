@@ -784,7 +784,7 @@ export default function TradeModal({
               <div>
                 <span className="text-neutral-500 block text-[10px] uppercase">Instrument & Market</span>
                 <strong className="text-neutral-900 font-bold block truncate">
-                  {selectedSymbol} <span className="font-normal text-neutral-600">({isNSE ? 'NSE India' : 'US Markets'})</span>
+                  {selectedSymbol} <span className="font-normal text-neutral-600">({isIndia ? 'NSE India' : 'US Markets'})</span>
                 </strong>
               </div>
               <div>

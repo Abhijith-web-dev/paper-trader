@@ -28,6 +28,7 @@ import {
 import { runBacktestAsync } from '../lib/backtester';
 import { STOCK_DIRECTORY, getStockHistoricalCandles } from '../lib/yahooFinance';
 import { searchGlobalEquities } from '../lib/stockSearchEngine';
+import { toast } from 'sonner';
 import BacktestReplayChart from './BacktestReplayChart';
 
 export default function BacktesterModal({ isOpen, onClose, currentStock }) {

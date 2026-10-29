@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "oxlint",
-    "test": "node tests/smoke.test.js && node tests/security_rules.test.js && node tests/journal_metrics.test.js",
+    "test": "node tests/smoke.test.js && node tests/security_rules.test.js && node tests/journal_metrics.test.js && node tests/local_e2e_test.js",
     "preview": "vite preview"
   },
   "dependencies": {

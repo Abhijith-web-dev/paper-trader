@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTradingTools } from '../context/TradingToolsContext';
@@ -53,6 +53,37 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { searchGlobalEquities, fetchLiveQuoteAnyStock } from '../lib/stockSearchEngine';
+
+const SECTOR_COLORS = [
+  'bg-blue-600 text-white',
+  'bg-emerald-600 text-white',
+  'bg-purple-600 text-white',
+  'bg-amber-600 text-white',
+  'bg-rose-600 text-white',
+  'bg-cyan-600 text-white',
+  'bg-indigo-600 text-white',
+  'bg-stone-600 text-white'
+];
+
+// Top 6 Curated Benchmark Leaders per market (Clean Broadsheet display instead of dumping all 30+ stocks)
+const BENCHMARK_LEADERS = {
+  NSE: [
+    STOCK_DIRECTORY['RELIANCE.NS'],
+    STOCK_DIRECTORY['TCS.NS'],
+    STOCK_DIRECTORY['HDFCBANK.NS'],
+    STOCK_DIRECTORY['INFY.NS'],
+    STOCK_DIRECTORY['TATAMOTORS.NS'],
+    STOCK_DIRECTORY['ICICIBANK.NS'],
+  ].filter(Boolean),
+  US: [
+    STOCK_DIRECTORY['AAPL'],
+    STOCK_DIRECTORY['NVDA'],
+    STOCK_DIRECTORY['MSFT'],
+    STOCK_DIRECTORY['AMZN'],
+    STOCK_DIRECTORY['GOOGL'],
+    STOCK_DIRECTORY['TSLA'],
+  ].filter(Boolean),
+};
 
 export default function DashboardPage() {
   const { 
@@ -125,8 +156,7 @@ export default function DashboardPage() {
   }, []);
 
   // Extract holdings & wallets
-  const holdingsMap = userProfile?.holdings || {};
-  const holdingsList = Object.values(holdingsMap);
+  const holdingsList = useMemo(() => Object.values(userProfile?.holdings || {}), [userProfile?.holdings]);
   const inrWallet = userProfile?.wallets?.inr || { cashBalance: 1000000, investedValue: 0, realizedPnL: 0 };
   const usdWallet = userProfile?.wallets?.usd || { cashBalance: 100000, investedValue: 0, realizedPnL: 0 };
 
@@ -171,109 +201,150 @@ export default function DashboardPage() {
     return true;
   });
 
-  // Calculate dynamic portfolio valuation with live prices
-  let totalInrCurrentValue = 0;
-  let totalUsdCurrentValue = 0;
-  let totalInrCost = 0;
-  let totalUsdCost = 0;
-  let totalInrNetPnL = 0;
-  let totalInrGrossPnL = 0;
-  let totalInrCharges = 0;
-  let totalUsdNetPnL = 0;
-  let totalUsdGrossPnL = 0;
-  let totalUsdCharges = 0;
+  // Calculate dynamic portfolio valuation with live prices (Memoized for high performance)
+  const {
+    totalInrCurrentValue,
+    totalUsdCurrentValue,
+    totalInrCost,
+    totalUsdCost,
+    totalInrNetPnL,
+    totalInrGrossPnL,
+    totalUsdNetPnL,
+    totalUsdGrossPnL,
+    totalInrCharges,
+    totalUsdCharges,
+    inrNetUnrealizedPnL,
+    inrGrossUnrealizedPnL,
+    inrNetUnrealizedPercent,
+    inrGrossUnrealizedPercent,
+    usdNetUnrealizedPnL,
+    usdGrossUnrealizedPnL,
+    usdNetUnrealizedPercent,
+    usdGrossUnrealizedPercent,
+    sectorList,
+    topHolding,
+    topHoldingPct,
+    inrEquityPct,
+    usdEquityPct,
+    totalPortfolioWealthINR,
+    cashReservePct,
+    stopLossRiskData,
+  } = useMemo(() => {
+    let inrVal = 0;
+    let usdVal = 0;
+    let inrCost = 0;
+    let usdCost = 0;
+    let inrNet = 0;
+    let inrGross = 0;
+    let usdNet = 0;
+    let usdGross = 0;
+    let inrFees = 0;
+    let usdFees = 0;
 
-  // Sector allocation & combined risk exposure dictionary
-  const sectorAllocations = {};
-  const SECTOR_COLORS = [
-    'bg-blue-600 text-white',
-    'bg-emerald-600 text-white',
-    'bg-purple-600 text-white',
-    'bg-amber-600 text-white',
-    'bg-rose-600 text-white',
-    'bg-cyan-600 text-white',
-    'bg-indigo-600 text-white',
-    'bg-stone-600 text-white'
-  ];
+    const sectorAllocations = {};
+    let totalEquity = 0;
+    let topHold = null;
+    let topHoldValINR = 0;
 
-  let totalEquityINR = 0;
-  let topHolding = null;
-  let topHoldingValINR = 0;
+    holdingsList.forEach((h) => {
+      const livePrice = Number(livePrices[h.symbol]?.price || h.avgBuyPrice || 100);
+      const currentVal = h.quantity * livePrice;
+      const cost = h.totalCost || (h.quantity * h.avgBuyPrice);
+      const isIndia = h.market === 'NSE' || h.currency === 'INR' || h.symbol?.endsWith('.NS') || h.symbol?.endsWith('.BO');
+      const exchange = isIndia ? 'NSE' : 'US';
 
-  holdingsList.forEach((h) => {
-    const livePrice = Number(livePrices[h.symbol]?.price || h.avgBuyPrice || 100);
-    const currentVal = h.quantity * livePrice;
-    const cost = h.totalCost || (h.quantity * h.avgBuyPrice);
-    const isIndia = h.market === 'NSE' || h.currency === 'INR' || h.symbol?.endsWith('.NS') || h.symbol?.endsWith('.BO');
-    const exchange = isIndia ? 'NSE' : 'US';
+      const acct = computeFloatingPositionAccounting({
+        avgBuyPrice: h.avgBuyPrice,
+        livePrice,
+        quantity: h.quantity,
+        market: exchange,
+        totalCost: cost,
+        stopLossPrice: h.stopLossPrice,
+      });
 
-    const acct = computeFloatingPositionAccounting({
-      avgBuyPrice: h.avgBuyPrice,
-      livePrice,
-      quantity: h.quantity,
-      market: exchange,
-      totalCost: cost,
-      stopLossPrice: h.stopLossPrice,
+      const dirInfo = STOCK_DIRECTORY[h.symbol] || {};
+      const sector = dirInfo.sector || h.sector || 'Equities';
+      const convertedValINR = isIndia ? currentVal : currentVal * 86.5; // proxy conversion for unified risk exposure
+      
+      sectorAllocations[sector] = (sectorAllocations[sector] || 0) + convertedValINR;
+      totalEquity += convertedValINR;
+
+      if (convertedValINR > topHoldValINR) {
+        topHoldValINR = convertedValINR;
+        topHold = { ...h, convertedValINR };
+      }
+
+      if (isIndia) {
+        inrVal += currentVal;
+        inrCost += cost;
+        inrGross += acct.floatingGrossPnL;
+        inrNet += acct.floatingNetPnL;
+        inrFees += acct.allocatedEntryCharges;
+      } else {
+        usdVal += currentVal;
+        usdCost += cost;
+        usdGross += acct.floatingGrossPnL;
+        usdNet += acct.floatingNetPnL;
+        usdFees += acct.allocatedEntryCharges;
+      }
     });
 
-    const dirInfo = STOCK_DIRECTORY[h.symbol] || {};
-    const sector = dirInfo.sector || h.sector || 'Equities';
-    const convertedValINR = isIndia ? currentVal : currentVal * 86.5; // proxy conversion for unified risk exposure
-    
-    sectorAllocations[sector] = (sectorAllocations[sector] || 0) + convertedValINR;
-    totalEquityINR += convertedValINR;
+    const inrNetPercent = inrCost > 0 ? (inrNet / inrCost) * 100 : 0;
+    const inrGrossPercent = inrCost > 0 ? (inrGross / inrCost) * 100 : 0;
+    const usdNetPercent = usdCost > 0 ? (usdNet / usdCost) * 100 : 0;
+    const usdGrossPercent = usdCost > 0 ? (usdGross / usdCost) * 100 : 0;
 
-    if (convertedValINR > topHoldingValINR) {
-      topHoldingValINR = convertedValINR;
-      topHolding = { ...h, convertedValINR };
-    }
+    // Calculate Stop-Loss Portfolio Risk across all active positions
+    const stopRiskData = calculatePortfolioStopLossRisk(holdingsList, livePrices, 86.5);
 
-    if (isIndia) {
-      totalInrCurrentValue += currentVal;
-      totalInrCost += cost;
-      totalInrGrossPnL += acct.floatingGrossPnL;
-      totalInrNetPnL += acct.floatingNetPnL;
-      totalInrCharges += acct.allocatedEntryCharges;
-    } else {
-      totalUsdCurrentValue += currentVal;
-      totalUsdCost += cost;
-      totalUsdGrossPnL += acct.floatingGrossPnL;
-      totalUsdNetPnL += acct.floatingNetPnL;
-      totalUsdCharges += acct.allocatedEntryCharges;
-    }
-  });
+    // Sector breakdown list for visual exposure bar
+    const sList = Object.entries(sectorAllocations).map(([name, val], index) => ({
+      name,
+      val,
+      percent: totalEquity > 0 ? (val / totalEquity) * 100 : 0,
+      color: SECTOR_COLORS[index % SECTOR_COLORS.length]
+    })).sort((a, b) => b.val - a.val);
 
-  const inrNetUnrealizedPnL = totalInrNetPnL;
-  const inrGrossUnrealizedPnL = totalInrGrossPnL;
-  const inrNetUnrealizedPercent = totalInrCost > 0 ? (inrNetUnrealizedPnL / totalInrCost) * 100 : 0;
-  const inrGrossUnrealizedPercent = totalInrCost > 0 ? (inrGrossUnrealizedPnL / totalInrCost) * 100 : 0;
+    const topPct = totalEquity > 0 && topHold ? (topHoldValINR / totalEquity) * 100 : 0;
+    const inrEqPct = totalEquity > 0 ? (inrVal / totalEquity) * 100 : 0;
+    const usdEqPct = totalEquity > 0 ? ((usdVal * 86.5) / totalEquity) * 100 : 0;
 
-  const usdNetUnrealizedPnL = totalUsdNetPnL;
-  const usdGrossUnrealizedPnL = totalUsdGrossPnL;
-  const usdNetUnrealizedPercent = totalUsdCost > 0 ? (usdNetUnrealizedPnL / totalUsdCost) * 100 : 0;
-  const usdGrossUnrealizedPercent = totalUsdCost > 0 ? (usdGrossUnrealizedPnL / totalUsdCost) * 100 : 0;
+    const inrCash = inrWallet.cashBalance || 0;
+    const usdCash = usdWallet.cashBalance || 0;
+    const totalWealth = totalEquity + inrCash + (usdCash * 86.5);
+    const cashPct = totalWealth > 0 
+      ? ((inrCash + (usdCash * 86.5)) / totalWealth) * 100 
+      : 100;
 
-  // Calculate Stop-Loss Portfolio Risk across all active positions
-  const stopLossRiskData = calculatePortfolioStopLossRisk(holdingsList, livePrices, 86.5);
-
-  // Sector breakdown list for visual exposure bar
-  const sectorList = Object.entries(sectorAllocations).map(([name, val], index) => ({
-    name,
-    val,
-    percent: totalEquityINR > 0 ? (val / totalEquityINR) * 100 : 0,
-    color: SECTOR_COLORS[index % SECTOR_COLORS.length]
-  })).sort((a, b) => b.val - a.val);
-
-  const topHoldingPct = totalEquityINR > 0 && topHolding ? (topHoldingValINR / totalEquityINR) * 100 : 0;
-  const totalInrEquityConverted = totalInrCurrentValue;
-  const totalUsdEquityConverted = totalUsdCurrentValue * 86.5;
-  const inrEquityPct = totalEquityINR > 0 ? (totalInrEquityConverted / totalEquityINR) * 100 : 0;
-  const usdEquityPct = totalEquityINR > 0 ? (totalUsdEquityConverted / totalEquityINR) * 100 : 0;
-  
-  const totalPortfolioWealthINR = totalEquityINR + (inrWallet.cashBalance || 0) + ((usdWallet.cashBalance || 0) * 86.5);
-  const cashReservePct = totalPortfolioWealthINR > 0 
-    ? (((inrWallet.cashBalance || 0) + ((usdWallet.cashBalance || 0) * 86.5)) / totalPortfolioWealthINR) * 100 
-    : 100;
+    return {
+      totalInrCurrentValue: inrVal,
+      totalUsdCurrentValue: usdVal,
+      totalInrCost: inrCost,
+      totalUsdCost: usdCost,
+      totalInrNetPnL: inrNet,
+      totalInrGrossPnL: inrGross,
+      totalUsdNetPnL: usdNet,
+      totalUsdGrossPnL: usdGross,
+      totalInrCharges: inrFees,
+      totalUsdCharges: usdFees,
+      inrNetUnrealizedPnL: inrNet,
+      inrGrossUnrealizedPnL: inrGross,
+      inrNetUnrealizedPercent: inrNetPercent,
+      inrGrossUnrealizedPercent: inrGrossPercent,
+      usdNetUnrealizedPnL: usdNet,
+      usdGrossUnrealizedPnL: usdGross,
+      usdNetUnrealizedPercent: usdNetPercent,
+      usdGrossUnrealizedPercent: usdGrossPercent,
+      sectorList: sList,
+      topHolding: topHold,
+      topHoldingPct: topPct,
+      inrEquityPct: inrEqPct,
+      usdEquityPct: usdEqPct,
+      totalPortfolioWealthINR: totalWealth,
+      cashReservePct: cashPct,
+      stopLossRiskData: stopRiskData,
+    };
+  }, [holdingsList, livePrices, inrWallet.cashBalance, usdWallet.cashBalance]);
 
   const openTrade = (symbol, action = 'BUY') => {
     setTradeModalSymbol(symbol);
@@ -327,26 +398,6 @@ export default function DashboardPage() {
   // Search state for Global Equities (Indian NSE/BSE & US NASDAQ/NYSE)
   const [searchResults, setSearchResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
-
-  // Top 6 Curated Benchmark Leaders per market (Clean Broadsheet display instead of dumping all 30+ stocks)
-  const BENCHMARK_LEADERS = {
-    NSE: [
-      STOCK_DIRECTORY['RELIANCE.NS'],
-      STOCK_DIRECTORY['TCS.NS'],
-      STOCK_DIRECTORY['HDFCBANK.NS'],
-      STOCK_DIRECTORY['INFY.NS'],
-      STOCK_DIRECTORY['TATAMOTORS.NS'],
-      STOCK_DIRECTORY['ICICIBANK.NS'],
-    ].filter(Boolean),
-    US: [
-      STOCK_DIRECTORY['AAPL'],
-      STOCK_DIRECTORY['NVDA'],
-      STOCK_DIRECTORY['MSFT'],
-      STOCK_DIRECTORY['AMZN'],
-      STOCK_DIRECTORY['GOOGL'],
-      STOCK_DIRECTORY['TSLA'],
-    ].filter(Boolean),
-  };
 
   // Active Featured Benchmark Leaders
   const featuredLeaders = useMemo(() => {
