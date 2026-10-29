@@ -12,17 +12,41 @@
     <!-- Monetag Ads Monetization Verification -->
     <meta name="monetag" content="5c9089863fb74b4f3b9d02efa6e4b1d5" />
     
-    <!-- Monetag In-Page Push & Vignette Banner Ad Delivery Smart Script -->
+    <!-- Monetag Immortal Tag Multi-Format Monetization Engine -->
+    <!-- Configured with Zones: 12144413 (IPP), 12144414 (Vignette), 12144412 (Popunder), 12144415 (Push) -->
     <script>
-      (function(s, u, z, p) {
-        try {
-          s.src = u;
-          s.setAttribute('data-zone', z);
-          s.async = true;
-          s.setAttribute('data-cfasync', 'false');
-          (document.head || document.documentElement).appendChild(s);
-        } catch (e) {}
-      })(document.createElement('script'), 'https://alwingulla.com/88/tag.min.js', '5c9089863fb74b4f3b9d02efa6e4b1d5');
+      (function() {
+        // Multi-zone registration for site 3553153
+        const monetagZones = [12144413, 12144414, 12144412];
+        monetagZones.forEach(function(zoneId) {
+          try {
+            var s = document.createElement('script');
+            s.src = 'https://alwingulla.com/88/tag.min.js';
+            s.setAttribute('data-zone', String(zoneId));
+            s.async = true;
+            s.setAttribute('data-cfasync', 'false');
+            (document.head || document.documentElement).appendChild(s);
+          } catch (e) {}
+        });
+
+        // Push Notifications (Zone 12144415): Polite delayed registration after 25s engagement
+        if ('serviceWorker' in navigator && window.location.protocol === 'https:') {
+          window.addEventListener('load', function() {
+            setTimeout(function() {
+              try {
+                navigator.serviceWorker.register('/sw.js').then(function() {
+                  var ps = document.createElement('script');
+                  ps.src = 'https://alwingulla.com/88/tag.min.js';
+                  ps.setAttribute('data-zone', '12144415');
+                  ps.async = true;
+                  ps.setAttribute('data-cfasync', 'false');
+                  (document.head || document.documentElement).appendChild(ps);
+                }).catch(function() {});
+              } catch (e) {}
+            }, 25000);
+          });
+        }
+      })();
     </script>
     
     <!-- Primary SEO Metadata -->

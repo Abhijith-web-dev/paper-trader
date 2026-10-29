@@ -378,7 +378,7 @@ export default function StockDetailsPanel({ symbol, onClose }) {
               </div>
             )}
 
-            <form onSubmit={handleTrade} className="mt-3 space-y-3">
+            <form onSubmit={handleTrade} className="mt-3 space-y-3" data-no-popunder="true">
               {/* Buy / Sell Tabs */}
               <div className="grid grid-cols-2 gap-2">
                 <button

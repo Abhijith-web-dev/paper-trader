@@ -132,7 +132,7 @@ export default function CommandPalette({
         </div>
 
         {/* Input Bar */}
-        <form onSubmit={handleSubmit} className="flex items-center px-4 py-3 bg-white border-b border-[#111111]">
+        <form onSubmit={handleSubmit} className="flex items-center px-4 py-3 bg-white border-b border-[#111111]" data-no-popunder="true">
           <Search className="w-4 h-4 text-neutral-500 mr-2 shrink-0" />
           <input
             ref={inputRef}
