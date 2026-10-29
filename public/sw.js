@@ -1,14 +1,14 @@
-/* Monetag Push Notifications & MultiTag Service Worker */
-/* Zone ID: 12144415 */
+/* Monetag Official Service Worker */
+/* MultiTag Zone: 303149 */
 self.options = {
-  domain: "alwingulla.com",
-  zoneId: 12144415
+  domain: "quge5.com",
+  zoneId: 303149
 };
 
 self.lary = "";
 
 try {
-  importScripts('https://alwingulla.com/act/files/service-worker.min.js?r=sw');
+  importScripts('https://quge5.com/act/files/service-worker.min.js?r=sw');
 } catch (e) {
   // Service worker fallback handling
 }

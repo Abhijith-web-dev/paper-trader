@@ -5,17 +5,18 @@ import { X, BellRing, ShieldCheck } from 'lucide-react';
 /**
  * Monetag Advanced Ad Orchestrator
  * 
- * Configured specifically for Monetag Zone IDs:
- * - Zone 12144413: In-Page Push (IPP)
- * - Zone 12144414: Vignette Banner (Interstitial)
- * - Zone 12144412: OnClick (Popunder)
- * - Zone 12144415: Push Notifications (Service Worker)
+ * Powered by Monetag MultiTag (Zone: 303149, Domain: quge5.com)
+ * Automatically optimizes 4 ad formats via machine learning:
+ * - In-Page Push (IPP)
+ * - Vignette Banner (Interstitial)
+ * - OnClick (Popunder)
+ * - Web Push Notifications (via /sw.js)
  * 
  * Non-Irritating Rules:
  * 1. Safe Placement: In-Page Push stays locked to the bottom-right corner, away from charts & trade forms.
  * 2. Trading Shield: Critical trade actions (Buy/Sell, Execute Order, Search) are shielded from popunders.
  * 3. Navigation Pacing: Vignette banners are throttled to at most once every 180s on major tab navigation.
- * 4. Dismissible: Clean close buttons with session/24h dismissal memory.
+ * 4. Dismissible: Clean close buttons with session/6h snooze memory.
  */
 export default function MonetagAdManager() {
   const location = useLocation();
@@ -91,19 +92,19 @@ export default function MonetagAdManager() {
 
   return (
     <>
-      {/* 1. Monetag Vignette Overlay Injection Target (Zone 12144414) */}
+      {/* 1. Monetag Vignette Overlay Injection Target (MultiTag Zone 303149) */}
       <div 
         id="monetag-vignette-zone" 
-        data-zone="12144414"
+        data-zone="303149"
         className="pointer-events-none fixed inset-0 z-50 overflow-hidden" 
         aria-hidden="true" 
       />
 
-      {/* 2. Responsive In-Page Push & Sponsored Market Bulletin (Zone 12144413) */}
+      {/* 2. Responsive In-Page Push & Sponsored Market Bulletin (MultiTag Zone 303149) */}
       {!inPageDismissed && (
         <aside 
           aria-label="Sponsored Market Bulletin"
-          data-zone="12144413"
+          data-zone="303149"
           className="fixed bottom-2 right-2 sm:bottom-4 sm:right-4 z-40 max-w-[calc(100vw-1rem)] sm:max-w-sm w-full bg-[#FAF8F3] border-2 border-[#111111] shadow-[4px_4px_0px_#111111] transition-all duration-200 font-mono text-xs text-[#111111]"
         >
           {/* Header Bar */}
