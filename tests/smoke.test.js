@@ -497,4 +497,55 @@ console.log('  Testing Respective Last Current Minutes Slicing & Window Integrit
 }
 console.log('  ✅ Respective Last Current Minutes Slicing & Window Integrity passed.');
 
-console.log('\n🎉 ALL SMOKE TESTS PASSED SUCCESSFULLY! (12/12 test suites)');
+// =========================================================================
+// TEST 13: Live Price Batching, Micro-Cache & Circuit Breaker Anti-Ban Resilience
+// =========================================================================
+console.log('  Testing Live Price Batching, Micro-Cache & Circuit Breaker Anti-Ban Resilience...');
+{
+  const { registerLiveSymbols, TV_SYMBOL_MAP, REVERSE_TV_MAP } = await import('../src/lib/omniFeed.js');
+  const { 
+    isCloudflareTripped, 
+    tripCloudflare, 
+    getCachedQuote, 
+    setCachedQuote 
+  } = await import('../src/lib/cloudQuotaManager.js');
+
+  // 13.1 Dynamic registration creates dual candidate mappings for Indian symbols
+  registerLiveSymbols(['TATASTEEL.NS']);
+  assert.ok(TV_SYMBOL_MAP['TATASTEEL.NS'] === 'NSE:TATASTEEL', 'Indian stock must map to NSE ticker');
+  assert.equal(REVERSE_TV_MAP['NSE:TATASTEEL'], 'TATASTEEL.NS', 'Reverse map for NSE ticker must resolve to original symbol');
+  assert.equal(REVERSE_TV_MAP['BSE:TATASTEEL'], 'TATASTEEL.NS', 'Reverse map for BSE ticker must resolve to original symbol');
+
+  // 13.2 Dynamic registration creates multi-exchange candidate mappings for US symbols
+  registerLiveSymbols(['COIN']);
+  assert.ok(TV_SYMBOL_MAP['COIN'] === 'NASDAQ:COIN', 'US stock default map must be created');
+  assert.equal(REVERSE_TV_MAP['NASDAQ:COIN'], 'COIN', 'Reverse map for NASDAQ:COIN must resolve to COIN');
+  assert.equal(REVERSE_TV_MAP['NYSE:COIN'], 'COIN', 'Reverse map for NYSE:COIN must resolve to COIN');
+
+  // 13.3 Quote micro-cache returns fresh quote without network
+  const mockQuote = {
+    symbol: 'AAPL',
+    price: 345.50,
+    timestamp: Date.now(),
+    source: 'test_engine',
+  };
+  setCachedQuote('AAPL', mockQuote, 15000);
+  const cached = getCachedQuote('AAPL');
+  assert.ok(cached != null, 'Cached quote must be retrieved');
+  assert.equal(cached.price, 345.50, 'Cached quote price must match');
+
+  // Expired quote returns null
+  setCachedQuote('EXPIRED_STOCK', mockQuote, -100);
+  assert.equal(getCachedQuote('EXPIRED_STOCK'), null, 'Expired quote must return null');
+
+  // 13.4 Cloudflare circuit breaker trip & reset
+  assert.equal(isCloudflareTripped(), false, 'Cloudflare circuit breaker initially must not be tripped');
+  tripCloudflare(500); // 500ms
+  assert.equal(isCloudflareTripped(), true, 'Circuit breaker must be tripped immediately after tripCloudflare()');
+  
+  await new Promise((r) => setTimeout(r, 550));
+  assert.equal(isCloudflareTripped(), false, 'Circuit breaker must auto-recover after cooldown');
+}
+console.log('  ✅ Live Price Batching, Micro-Cache & Circuit Breaker Anti-Ban Resilience passed.');
+
+console.log('\n🎉 ALL SMOKE TESTS PASSED SUCCESSFULLY! (13/13 test suites)');

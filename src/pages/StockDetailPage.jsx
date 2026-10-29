@@ -3,7 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTradingTools } from '../context/TradingToolsContext';
 import { STOCK_DIRECTORY, getStockQuote, getOrderBook, fetchSingleYahooQuote } from '../lib/yahooFinance';
-import { subscribeToMarketStream } from '../lib/omniFeed';
+import { subscribeToMarketStream, registerLiveSymbols } from '../lib/omniFeed';
 import { browserMarketServer } from '../lib/browserMarketServer';
 import { getQuoteFreshness } from '../lib/quoteFreshness';
 import { isMarketOpenForSymbol } from '../lib/marketHours';
@@ -97,6 +97,9 @@ export default function StockDetailPage() {
 
   useEffect(() => {
     setMarketInfo(isMarketOpenForSymbol(symbol));
+    if (symbol) {
+      registerLiveSymbols(symbol);
+    }
   }, [symbol, allowSandbox]);
 
   // 1. High-Precision In-Browser Market Server Engine (0ms initial render + 1s micro-ticks)

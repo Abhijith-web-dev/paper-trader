@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { STOCK_DIRECTORY, getStockQuote, getOrderBook, fetchSingleYahooQuote } from '../lib/yahooFinance';
+import { registerLiveSymbols } from '../lib/omniFeed';
 import { browserMarketServer } from '../lib/browserMarketServer';
 import { isMarketOpenForSymbol } from '../lib/marketHours';
 import MarketStatusBadge from './MarketStatusBadge';
@@ -45,6 +46,9 @@ export default function StockDetailsPanel({ symbol, onClose }) {
 
   useEffect(() => {
     setMarketInfo(isMarketOpenForSymbol(symbol));
+    if (symbol) {
+      registerLiveSymbols(symbol);
+    }
   }, [symbol, allowSandbox]);
 
   const stockInfo = useMemo(() => {

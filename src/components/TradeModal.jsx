@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { STOCK_DIRECTORY, getStockQuote, registerDynamicStock } from '../lib/yahooFinance';
+import { registerLiveSymbols } from '../lib/omniFeed';
 import { searchGlobalEquities } from '../lib/stockSearchEngine';
 import { isMarketOpenForSymbol } from '../lib/marketHours';
 import { getQuoteFreshness } from '../lib/quoteFreshness';
@@ -67,9 +68,10 @@ export default function TradeModal({
 
   const [marketInfo, setMarketInfo] = useState(() => isMarketOpenForSymbol(startingSymbol));
 
-  // Auto-register selectedSymbol if not in directory
+  // Auto-register selectedSymbol if not in directory & register in central batch feed
   useEffect(() => {
     if (!selectedSymbol) return;
+    registerLiveSymbols(selectedSymbol);
     if (!STOCK_DIRECTORY[selectedSymbol]) {
       const isInd = selectedSymbol.endsWith('.NS') || selectedSymbol.endsWith('.BO');
       registerDynamicStock({

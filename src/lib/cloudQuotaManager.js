@@ -19,6 +19,13 @@
 const searchCache = new Map();
 const SEARCH_CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes
 
+// Memory Micro-Cache for Live Quotes (Key: symbol, Value: { quote, timestamp, ttl })
+const quoteMicroCache = new Map();
+const DEFAULT_QUOTE_TTL_MS = 15 * 1000; // 15 seconds fresh window
+
+// Cloudflare Circuit Breaker: trips when HTTP 429 is encountered
+let cloudflareTrippedUntil = 0;
+
 // In-flight Promise deduplication registry
 const inFlightPromises = new Map();
 
@@ -136,6 +143,45 @@ export function setCachedSearch(query, marketFilter = 'ALL', results = []) {
     const entries = Array.from(searchCache.entries()).slice(-100);
     localStorage.setItem(PERSISTENT_SEARCH_CACHE_KEY, JSON.stringify(Object.fromEntries(entries)));
   } catch (e) {}
+}
+
+/**
+ * Cloudflare Circuit Breaker
+ * Prevents repeating failing requests when rate limited (HTTP 429)
+ */
+export function isCloudflareTripped() {
+  return Date.now() < cloudflareTrippedUntil;
+}
+
+export function tripCloudflare(durationMs = 60000) {
+  cloudflareTrippedUntil = Date.now() + durationMs;
+  console.warn(`[CloudQuotaManager] Cloudflare circuit tripped for ${Math.round(durationMs / 1000)}s due to upstream rate limiting.`);
+}
+
+/**
+ * Micro-Cache for Individual Quotes (Prevents repeat network calls within TTL window)
+ */
+export function getCachedQuote(symbol) {
+  if (!symbol) return null;
+  const sym = String(symbol).trim().toUpperCase();
+  const entry = quoteMicroCache.get(sym);
+  if (entry && (Date.now() - entry.timestamp < entry.ttl)) {
+    quotaStats.cloudflare.cacheHits++;
+    quotaStats.cloudflare.requestsSaved++;
+    saveQuotaStats();
+    return entry.quote;
+  }
+  return null;
+}
+
+export function setCachedQuote(symbol, quote, ttlMs = DEFAULT_QUOTE_TTL_MS) {
+  if (!symbol || !quote) return;
+  const sym = String(symbol).trim().toUpperCase();
+  quoteMicroCache.set(sym, {
+    quote,
+    timestamp: Date.now(),
+    ttl: ttlMs,
+  });
 }
 
 /**

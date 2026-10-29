@@ -1,6 +1,13 @@
 import { synthesizeCandlesticks } from './microstructureEngine.js';
 import { saveCandlesCache, getCandlesCache } from './localDb.js';
-import { recordCloudflareCall, coalesceAsync } from './cloudQuotaManager.js';
+import { 
+  recordCloudflareCall, 
+  coalesceAsync, 
+  isCloudflareTripped, 
+  tripCloudflare, 
+  getCachedQuote, 
+  setCachedQuote 
+} from './cloudQuotaManager.js';
 import { 
   validateCandle, 
   aggregateIntradayCandles, 
@@ -573,10 +580,12 @@ export async function fetchLiveQuotesParallel(symbols) {
  * Operates natively with CORS on all deployment environments (Firebase Hosting, Vercel, Netlify)
  */
 export async function fetchSingleTVQuote(symbol) {
-  const isNSE = symbol.endsWith('.NS');
-  const market = isNSE ? 'india' : 'america';
-  const cleanTicker = isNSE ? symbol.replace('.NS', '') : symbol;
-  const candidateTickers = isNSE 
+  if (!symbol) return null;
+  const sym = symbol.toUpperCase();
+  const isIndian = sym.endsWith('.NS') || sym.endsWith('.BO') || STOCK_DIRECTORY[sym]?.market === 'NSE';
+  const market = isIndian ? 'india' : 'america';
+  const cleanTicker = sym.replace(/\.(NS|BO)$/, '');
+  const candidateTickers = isIndian 
     ? [`NSE:${cleanTicker}`, `BSE:${cleanTicker}`] 
     : [`NASDAQ:${cleanTicker}`, `NYSE:${cleanTicker}`, `AMEX:${cleanTicker}`];
 
@@ -625,10 +634,10 @@ export async function fetchSingleTVQuote(symbol) {
           const previousClose = Number((changeAbs != null ? (currentPrice - changeAbs) : (open || currentPrice)).toFixed(2));
 
           const quote = {
-            symbol,
+            symbol: sym,
             name: stockInfo.name || name || cleanTicker,
-            currency: stockInfo.currency || (isNSE ? 'INR' : 'USD'),
-            market: stockInfo.market || (isNSE ? 'NSE' : 'US'),
+            currency: stockInfo.currency || (isIndian ? 'INR' : 'USD'),
+            market: stockInfo.market || (isIndian ? 'NSE' : 'US'),
             price: currentPrice,
             change: Number((changeAbs != null ? changeAbs : 0).toFixed(2)),
             changePercent: Number((changePercent != null ? changePercent : 0).toFixed(2)),
@@ -677,6 +686,7 @@ export async function fetchSingleTVQuote(symbol) {
           }
 
           runtimePriceStore.set(symbol, quote);
+          setCachedQuote(symbol, quote, 15000);
           return quote;
         }
       }
@@ -735,6 +745,20 @@ export async function fetchSingleYahooQuote(symbol, timeoutMs = 3000) {
   const upper = symbol.toUpperCase();
   const targetSymbol = STOCK_DIRECTORY[upper]?.targetSymbol || upper;
 
+  // Tier 0: Instant Micro-Cache Check (0ms latency, zero network hits)
+  const cached = getCachedQuote(upper);
+  if (cached && cached.price) {
+    return cached;
+  }
+
+  // Tier 0.5: In-memory runtime store check if fresh (< 15 seconds)
+  const memoryQuote = runtimePriceStore.get(upper);
+  if (memoryQuote && memoryQuote.price && memoryQuote.timestamp && (Date.now() - memoryQuote.timestamp < 15000)) {
+    if (memoryQuote.source !== 'instant_seed' && memoryQuote.source !== 'directory_baseline') {
+      return memoryQuote;
+    }
+  }
+
   return coalesceAsync(`quote_${upper}`, async () => {
     // First try TradingView Scanner edge (natively supports CORS in production with 0 Cloudflare worker usage)
     try {
@@ -743,9 +767,15 @@ export async function fetchSingleYahooQuote(symbol, timeoutMs = 3000) {
         if (targetSymbol !== upper) {
           runtimePriceStore.set(upper, { ...tvQuote, symbol: upper });
         }
+        setCachedQuote(upper, tvQuote, 15000);
         return tvQuote;
       }
     } catch (e) {}
+
+    // Check Cloudflare circuit breaker before attempting proxy
+    if (isCloudflareTripped()) {
+      return runtimePriceStore.get(upper) || generateFallbackQuote(upper);
+    }
 
     const isDev = typeof window !== 'undefined' && 
       (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
@@ -765,6 +795,11 @@ export async function fetchSingleYahooQuote(symbol, timeoutMs = 3000) {
         recordCloudflareCall(endpoint, false);
         const res = await fetch(endpoint, { signal: controller.signal });
         clearTimeout(timeoutId);
+
+        if (res.status === 429) {
+          tripCloudflare(60000);
+          break;
+        }
 
         const contentType = res.headers.get('content-type') || '';
         if (!res.ok || !contentType.includes('application/json')) {
@@ -826,8 +861,10 @@ export async function fetchSingleYahooQuote(symbol, timeoutMs = 3000) {
         }
 
         runtimePriceStore.set(upper, quote);
+        setCachedQuote(upper, quote, 15000);
         if (targetSymbol !== upper) {
           runtimePriceStore.set(targetSymbol, quote);
+          setCachedQuote(targetSymbol, quote, 15000);
         }
         return quote;
       } catch (err) {

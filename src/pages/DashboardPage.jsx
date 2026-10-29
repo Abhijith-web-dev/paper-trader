@@ -5,7 +5,8 @@ import { useTradingTools } from '../context/TradingToolsContext';
 import { STOCK_DIRECTORY, getInstantInitialQuotes } from '../lib/yahooFinance';
 import { 
   subscribeToMarketStream, 
-  syncTradingViewScanner 
+  syncTradingViewScanner,
+  registerLiveSymbols 
 } from '../lib/omniFeed';
 import { getNSEMarketStatus, getUSMarketStatus, isMarketOpenForSymbol } from '../lib/marketHours';
 import { getQuoteFreshness } from '../lib/quoteFreshness';
@@ -477,7 +478,19 @@ export default function DashboardPage() {
     };
   }, [searchQuery, activeTab]);
 
-  // Guarded fetch for missing quotes for displayed watchlist stocks
+  // Dynamic Multi-Ticker Batch Registration: All active holdings & displayed watchlist symbols
+  // are synced together in unified TradingView batches without individual API waterfalls
+  useEffect(() => {
+    const symbolsToBatch = [
+      ...holdingsList.map((h) => h.symbol),
+      ...displayedWatchlistSymbols,
+    ];
+    if (symbolsToBatch.length > 0) {
+      registerLiveSymbols(symbolsToBatch);
+    }
+  }, [holdingsList, displayedWatchlistSymbols]);
+
+  // Secondary safety net: If any watchlist symbol is still missing after 3.5s, fetch with micro-cache
   const inFlightQuotesRef = useRef(new Set());
   useEffect(() => {
     const missing = displayedWatchlistSymbols.filter((sym) => !livePrices[sym] && !inFlightQuotesRef.current.has(sym));
@@ -486,31 +499,34 @@ export default function DashboardPage() {
     missing.forEach((sym) => inFlightQuotesRef.current.add(sym));
 
     let isSubscribed = true;
-    Promise.all(
-      missing.map(async (sym) => {
-        try {
-          const q = await fetchLiveQuoteAnyStock(sym);
-          return q ? [sym, q] : null;
-        } catch {
-          return null;
-        }
-      })
-    ).then((results) => {
-      if (!isSubscribed) return;
-      const valid = results.filter(Boolean);
-      if (valid.length > 0) {
-        setLivePrices((prev) => {
-          const next = { ...prev };
-          valid.forEach(([sym, q]) => {
-            next[sym] = q;
+    const timeout = setTimeout(() => {
+      Promise.all(
+        missing.map(async (sym) => {
+          try {
+            const q = await fetchLiveQuoteAnyStock(sym);
+            return q ? [sym, q] : null;
+          } catch {
+            return null;
+          }
+        })
+      ).then((results) => {
+        if (!isSubscribed) return;
+        const valid = results.filter(Boolean);
+        if (valid.length > 0) {
+          setLivePrices((prev) => {
+            const next = { ...prev };
+            valid.forEach(([sym, q]) => {
+              next[sym] = q;
+            });
+            return next;
           });
-          return next;
-        });
-      }
-    });
+        }
+      });
+    }, 2500);
 
     return () => {
       isSubscribed = false;
+      clearTimeout(timeout);
     };
   }, [displayedWatchlistSymbols, livePrices]);
 
@@ -521,6 +537,7 @@ export default function DashboardPage() {
       const added = await toggleWatchlist(symbol, market, category);
       if (added) {
         toast.success(`Added ${symbol} to your ${market} Watchlist ⭐`);
+        registerLiveSymbols(symbol);
         if (!livePrices[symbol]) {
           const q = await fetchLiveQuoteAnyStock(symbol);
           if (q) setLivePrices((prev) => ({ ...prev, [symbol]: q }));

@@ -10,7 +10,7 @@ import {
   LineStyle 
 } from 'lightweight-charts';
 import { getStockHistoricalCandles, getStockQuote, STOCK_DIRECTORY } from '../lib/yahooFinance';
-import { subscribeToMarketStream } from '../lib/omniFeed';
+import { subscribeToMarketStream, registerLiveSymbols } from '../lib/omniFeed';
 import { getQuoteFreshness } from '../lib/quoteFreshness';
 import { calculateSMA, calculateEMA, calculateBollingerBands } from '../lib/indicators';
 import { 
@@ -192,6 +192,9 @@ export default function StockChart({
   useEffect(() => {
     let isMounted = true;
     setLoading(true);
+    if (symbol) {
+      registerLiveSymbols(symbol);
+    }
 
     async function loadCandles() {
       try {

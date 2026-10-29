@@ -5,15 +5,17 @@
  * Features:
  * 1. Single Source of Truth: All UI components (Dashboard, Chart, Order Book, Journal)
  *    listen to the exact same reactive stream.
- * 2. Anti-Ban Request Batching: All Indian stocks in 1 request, all US stocks in 1 request.
- *    Reduces API calls by 96% (from 100 req/min down to ~4.8 req/min).
- * 3. Page Visibility API: Polling completely pauses when tab is hidden or minimized.
- *    Resumes with immediate sync upon returning.
- * 4. Resilient Circuit Breaker: Exponential backoff on rate limits (429) or network hiccups.
- * 5. In-flight Request Coalescing: Duplicate parallel calls share a single network promise.
+ * 2. Dynamic Anti-Ban Request Batching: All Indian stocks in 1 request, all US stocks in 1 request.
+ *    Supports unlimited custom and dynamic symbols without flooding APIs.
+ * 3. Market-Hours Aware Adaptive Polling:
+ *    - Active market sessions (NSE or US): Snappy 18-second refresh cadence.
+ *    - Off-hours (nights, weekends, official exchange holidays): 120-second background cadence.
+ *    - Hidden tab: 100% paused (0 network requests).
+ * 4. Resilient Circuit Breakers & In-Flight Coalescing: Prevents cascading 429 errors.
  */
 
-import { STOCK_DIRECTORY, getInstantInitialQuotes, runtimePriceStore } from './yahooFinance';
+import { STOCK_DIRECTORY, getInstantInitialQuotes, runtimePriceStore } from './yahooFinance.js';
+import { getNSEMarketStatus, getUSMarketStatus } from './marketHours.js';
 
 // Map internal tickers to official TradingView scanner exchange symbols
 export const TV_SYMBOL_MAP = {
@@ -38,6 +40,16 @@ export const TV_SYMBOL_MAP = {
   'IDEA.NS': 'NSE:IDEA',
   'YESBANK.NS': 'NSE:YESBANK',
   'IRFC.NS': 'NSE:IRFC',
+  'MARUTI.NS': 'NSE:MARUTI',
+  'SUNPHARMA.NS': 'NSE:SUNPHARMA',
+  'AXISBANK.NS': 'NSE:AXISBANK',
+  'KOTAKBANK.NS': 'NSE:KOTAKBANK',
+  'BAJFINANCE.NS': 'NSE:BAJFINANCE',
+  'HINDUNILVR.NS': 'NSE:HINDUNILVR',
+  'ONGC.NS': 'NSE:ONGC',
+  'NTPC.NS': 'NSE:NTPC',
+  'POWERGRID.NS': 'NSE:POWERGRID',
+  'COALINDIA.NS': 'NSE:COALINDIA',
 
   // US Stocks (NASDAQ / NYSE / AMEX)
   'AAPL': 'NASDAQ:AAPL',
@@ -51,12 +63,46 @@ export const TV_SYMBOL_MAP = {
   'NFLX': 'NASDAQ:NFLX',
   'SPY': 'AMEX:SPY',
   'PLTR': 'NASDAQ:PLTR',
+  'BRK-B': 'NYSE:BRK.B',
+  'V': 'NYSE:V',
+  'JNJ': 'NYSE:JNJ',
+  'WMT': 'NYSE:WMT',
+  'JPM': 'NYSE:JPM',
+  'UNH': 'NYSE:UNH',
+  'MA': 'NYSE:MA',
+  'PG': 'NYSE:PG',
+  'HD': 'NYSE:HD',
+  'DIS': 'NYSE:DIS',
+  'INTC': 'NASDAQ:INTC',
+  'COIN': 'NASDAQ:COIN',
+  'QCOM': 'NASDAQ:QCOM',
+  'BABA': 'NYSE:BABA',
 };
 
-// Reverse map: TV Symbol -> Internal Ticker
-const REVERSE_TV_MAP = Object.fromEntries(
-  Object.entries(TV_SYMBOL_MAP).map(([internal, tv]) => [tv, internal])
-);
+// Reverse map: TV Symbol -> Internal Ticker (Registers candidate exchanges for 100% resolution reliability)
+export const REVERSE_TV_MAP = {};
+
+function registerReverseCandidateMappings(internalSymbol, tvPreferred) {
+  const sym = internalSymbol.toUpperCase();
+  const isIndian = sym.endsWith('.NS') || sym.endsWith('.BO') || STOCK_DIRECTORY[sym]?.market === 'NSE';
+  const clean = sym.replace(/\.(NS|BO)$/, '');
+
+  if (tvPreferred) {
+    REVERSE_TV_MAP[tvPreferred] = sym;
+  }
+  if (isIndian) {
+    REVERSE_TV_MAP[`NSE:${clean}`] = sym;
+    REVERSE_TV_MAP[`BSE:${clean}`] = sym;
+  } else {
+    REVERSE_TV_MAP[`NASDAQ:${clean}`] = sym;
+    REVERSE_TV_MAP[`NYSE:${clean}`] = sym;
+    REVERSE_TV_MAP[`AMEX:${clean}`] = sym;
+  }
+}
+
+Object.entries(TV_SYMBOL_MAP).forEach(([internal, tv]) => {
+  registerReverseCandidateMappings(internal, tv);
+});
 
 // Event-driven reactive store
 const listeners = new Set();
@@ -70,7 +116,59 @@ let tvConsecutiveFailures = 0;
 
 // Central polling timer reference
 let centralPollingTimer = null;
-const POLLING_INTERVAL_MS = 25000; // Safe 25-second cadence
+
+/**
+ * Dynamically register arbitrary symbols into the central batch scanner
+ * Ensures user-added stocks, portfolio holdings, and watchlists are fetched in single multi-ticker requests
+ */
+export function registerLiveSymbols(symbols = []) {
+  if (!symbols) return;
+  const list = Array.isArray(symbols) ? symbols : [symbols];
+  let hasNew = false;
+
+  list.forEach((raw) => {
+    if (!raw) return;
+    const sym = String(raw).trim().toUpperCase();
+    if (!sym) return;
+
+    if (!TV_SYMBOL_MAP[sym]) {
+      const isIndian =
+        sym.endsWith('.NS') ||
+        sym.endsWith('.BO') ||
+        STOCK_DIRECTORY[sym]?.market === 'NSE';
+
+      const clean = sym.replace(/\.(NS|BO)$/, '');
+
+      if (isIndian) {
+        const nseTv = `NSE:${clean}`;
+        const bseTv = `BSE:${clean}`;
+        TV_SYMBOL_MAP[sym] = nseTv;
+        REVERSE_TV_MAP[nseTv] = sym;
+        REVERSE_TV_MAP[bseTv] = sym;
+        hasNew = true;
+      } else {
+        const nasTv = `NASDAQ:${clean}`;
+        const nyseTv = `NYSE:${clean}`;
+        const amexTv = `AMEX:${clean}`;
+        TV_SYMBOL_MAP[sym] = nasTv;
+        REVERSE_TV_MAP[nasTv] = sym;
+        REVERSE_TV_MAP[nyseTv] = sym;
+        REVERSE_TV_MAP[amexTv] = sym;
+        hasNew = true;
+      }
+    }
+  });
+
+  if (hasNew) {
+    // Immediate background batch sync for newly registered symbols
+    syncTradingViewScanner();
+  }
+}
+
+// Pre-register all universe symbols from directory on init
+if (typeof STOCK_DIRECTORY === 'object') {
+  registerLiveSymbols(Object.keys(STOCK_DIRECTORY));
+}
 
 /**
  * Returns current quote synchronously from L1 RAM (0.00ms latency)
@@ -129,28 +227,49 @@ export function broadcastQuoteUpdates(updates, engineName = 'Normalized Exchange
 }
 
 /**
+ * Calculates adaptive polling interval based on official market hours
+ */
+function getAdaptivePollingInterval() {
+  try {
+    const nse = getNSEMarketStatus();
+    const us = getUSMarketStatus();
+    const anyMarketOpen = Boolean((nse && nse.isOpen) || (us && us.isOpen));
+
+    // When an exchange is actively trading: snappy 18s updates
+    // When both exchanges are closed: 120s background updates (saves 85% bandwidth/calls)
+    return anyMarketOpen ? 18000 : 120000;
+  } catch (e) {
+    return 20000;
+  }
+}
+
+/**
  * Central Batch-Sync from TradingView Scanner API
  * Coalesces concurrent calls into a single network operation
  */
 export async function syncTradingViewScanner() {
-  // If a sync is already running, reuse the pending promise
   if (inFlightSyncPromise) {
     return inFlightSyncPromise;
   }
 
-  // Check circuit breaker
+  // Respect circuit breaker if tripped
   if (Date.now() < tvCircuitBrokenUntil) {
     return omniFeedMemoryStore;
   }
 
   inFlightSyncPromise = (async () => {
-    const nseTickers = Object.entries(TV_SYMBOL_MAP)
-      .filter(([internal]) => internal.endsWith('.NS'))
-      .map(([, tv]) => tv);
+    // Partition tickers into Indian and US sets
+    const nseTickers = [];
+    const usTickers = [];
 
-    const usTickers = Object.entries(TV_SYMBOL_MAP)
-      .filter(([internal]) => !internal.endsWith('.NS'))
-      .map(([, tv]) => tv);
+    Object.entries(TV_SYMBOL_MAP).forEach(([internal, tv]) => {
+      const isIndian = internal.endsWith('.NS') || internal.endsWith('.BO') || STOCK_DIRECTORY[internal]?.market === 'NSE';
+      if (isIndian) {
+        nseTickers.push(tv);
+      } else {
+        usTickers.push(tv);
+      }
+    });
 
     const updates = {};
 
@@ -183,12 +302,12 @@ export async function syncTradingViewScanner() {
         } catch (e) {}
       } else {
         tvConsecutiveFailures++;
-        const backoffMs = Math.min(60000 * Math.pow(2, tvConsecutiveFailures - 1), 300000);
+        const backoffMs = Math.min(30000 * Math.pow(2, tvConsecutiveFailures - 1), 180000);
         tvCircuitBrokenUntil = Date.now() + backoffMs;
       }
     } catch (err) {
       tvConsecutiveFailures++;
-      const backoffMs = Math.min(60000 * Math.pow(2, tvConsecutiveFailures - 1), 300000);
+      const backoffMs = Math.min(30000 * Math.pow(2, tvConsecutiveFailures - 1), 180000);
       tvCircuitBrokenUntil = Date.now() + backoffMs;
     } finally {
       inFlightSyncPromise = null;
@@ -202,110 +321,140 @@ export async function syncTradingViewScanner() {
 
 /**
  * Fetch a single market batch from TradingView Scanner via direct CORS POST
+ * Chunks requests if ticker count exceeds 60 for ultra-reliable transport
  */
 async function fetchTVScanner(market, tickers) {
+  if (!tickers || tickers.length === 0) return {};
+
   const isDev = typeof window !== 'undefined' && 
     (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
 
-  // Direct edge endpoint has verified CORS headers in production
   const candidateUrls = isDev
     ? [`/api/tv-scanner/${market}/scan`, `https://scanner.tradingview.com/${market}/scan`]
     : [`https://scanner.tradingview.com/${market}/scan`];
 
-  const body = JSON.stringify({
-    symbols: { tickers },
-    columns: [
-      'name', 'close', 'change', 'change_abs', 'volume', 'high', 'low', 'open',
-      'price_52_week_high', 'price_52_week_low',
-      'Perf.W', 'Perf.1M', 'Perf.3M', 'Perf.6M', 'Perf.Y',
-      'SMA20', 'SMA50', 'SMA200', 'RSI'
-    ],
-  });
+  // Chunk tickers into batches of 60 max for stability
+  const chunks = [];
+  const chunkSize = 60;
+  for (let i = 0; i < tickers.length; i += chunkSize) {
+    chunks.push(tickers.slice(i, i + chunkSize));
+  }
 
-  let json = null;
-  for (const targetUrl of candidateUrls) {
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 6000);
+  const combinedParsed = {};
 
-      const res = await fetch(targetUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'text/plain',
-        },
-        body,
-        signal: controller.signal,
-      });
-      clearTimeout(timeoutId);
+  for (const chunk of chunks) {
+    const body = JSON.stringify({
+      symbols: { tickers: chunk },
+      columns: [
+        'name', 'close', 'change', 'change_abs', 'volume', 'high', 'low', 'open',
+        'price_52_week_high', 'price_52_week_low',
+        'Perf.W', 'Perf.1M', 'Perf.3M', 'Perf.6M', 'Perf.Y',
+        'SMA20', 'SMA50', 'SMA200', 'RSI'
+      ],
+    });
 
-      const contentType = res.headers.get('content-type') || '';
-      if (res.ok && contentType.includes('application/json')) {
-        json = await res.json();
-        if (Array.isArray(json?.data) && json.data.length > 0) {
+    let json = null;
+    for (const targetUrl of candidateUrls) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 6000);
+
+        const res = await fetch(targetUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain' },
+          body,
+          signal: controller.signal,
+        });
+        clearTimeout(timeoutId);
+
+        const contentType = res.headers.get('content-type') || '';
+        if (res.ok && contentType.includes('application/json')) {
+          json = await res.json();
+          if (Array.isArray(json?.data)) {
+            break;
+          }
+        } else if (res.status === 429) {
+          tvCircuitBrokenUntil = Date.now() + 60000;
           break;
         }
-      } else if (res.status === 429) {
-        // Rate limited - trip circuit breaker
-        tvCircuitBrokenUntil = Date.now() + 60000;
-        break;
+      } catch (err) {
+        // Try fallback candidate url
       }
-    } catch (err) {
-      // Continue to next candidate URL without error spam
+    }
+
+    if (json?.data && Array.isArray(json.data)) {
+      json.data.forEach((item) => {
+        const tvSymbol = item.s;
+        const internalSymbol = REVERSE_TV_MAP[tvSymbol];
+        if (!internalSymbol) return;
+
+        const [
+          name, close, changePercent, changeAbs, volume, high, low, open,
+          high52, low52,
+          perfW, perf1M, perf3M, perf6M, perfY,
+          sma20, sma50, sma200, rsi
+        ] = item.d || [];
+
+        const stockInfo = STOCK_DIRECTORY[internalSymbol] || {};
+
+        combinedParsed[internalSymbol] = {
+          symbol: internalSymbol,
+          name: stockInfo.name || name,
+          market: stockInfo.market || (internalSymbol.endsWith('.NS') ? 'NSE' : 'US'),
+          currency: stockInfo.currency || (internalSymbol.endsWith('.NS') ? 'INR' : 'USD'),
+          price: Number(close != null ? close.toFixed(2) : stockInfo.basePrice),
+          change: Number(changeAbs != null ? changeAbs.toFixed(2) : 0),
+          changePercent: Number(changePercent != null ? changePercent.toFixed(2) : 0),
+          high: Number((high || close || stockInfo.basePrice).toFixed(2)),
+          low: Number((low || close || stockInfo.basePrice).toFixed(2)),
+          open: Number((open || close || stockInfo.basePrice).toFixed(2)),
+          previousClose: Number(((close || stockInfo.basePrice) - (changeAbs || 0)).toFixed(2)),
+          volume: formatVolume(volume),
+          rawVolume: volume || 0,
+          marketCap: stockInfo.marketCap || 'N/A',
+          peRatio: stockInfo.peRatio || 'N/A',
+          high52: high52 || stockInfo.high52,
+          low52: low52 || stockInfo.low52,
+          perfW: perfW != null ? Number(perfW.toFixed(2)) : 0,
+          perf1M: perf1M != null ? Number(perf1M.toFixed(2)) : 0,
+          perf3M: perf3M != null ? Number(perf3M.toFixed(2)) : 0,
+          perf6M: perf6M != null ? Number(perf6M.toFixed(2)) : 0,
+          perfY: perfY != null ? Number(perfY.toFixed(2)) : 0,
+          sma20: sma20 != null ? Number(sma20.toFixed(2)) : null,
+          sma50: sma50 != null ? Number(sma50.toFixed(2)) : null,
+          sma200: sma200 != null ? Number(sma200.toFixed(2)) : null,
+          rsi: rsi != null ? Number(rsi.toFixed(2)) : null,
+          sector: stockInfo.sector || 'Equities',
+          timestamp: Date.now(),
+          source: 'tradingview_edge',
+        };
+      });
     }
   }
 
-  if (!json?.data || !Array.isArray(json.data)) return null;
+  return combinedParsed;
+}
 
-  const parsed = {};
+/**
+ * Adaptive Central Polling Scheduler
+ */
+function scheduleNextPoll() {
+  if (centralPollingTimer != null) {
+    clearTimeout(centralPollingTimer);
+    centralPollingTimer = null;
+  }
 
-  json.data.forEach((item) => {
-    const tvSymbol = item.s;
-    const internalSymbol = REVERSE_TV_MAP[tvSymbol];
-    if (!internalSymbol) return;
+  if (typeof window === 'undefined') return;
+  if (typeof document !== 'undefined' && document.hidden) return;
 
-    const [
-      name, close, changePercent, changeAbs, volume, high, low, open,
-      high52, low52,
-      perfW, perf1M, perf3M, perf6M, perfY,
-      sma20, sma50, sma200, rsi
-    ] = item.d || [];
-
-    const stockInfo = STOCK_DIRECTORY[internalSymbol] || {};
-
-    parsed[internalSymbol] = {
-      symbol: internalSymbol,
-      name: stockInfo.name || name,
-      market: stockInfo.market,
-      currency: stockInfo.currency,
-      price: Number(close != null ? close.toFixed(2) : stockInfo.basePrice),
-      change: Number(changeAbs != null ? changeAbs.toFixed(2) : 0),
-      changePercent: Number(changePercent != null ? changePercent.toFixed(2) : 0),
-      high: Number((high || close || stockInfo.basePrice).toFixed(2)),
-      low: Number((low || close || stockInfo.basePrice).toFixed(2)),
-      open: Number((open || close || stockInfo.basePrice).toFixed(2)),
-      previousClose: Number(((close || stockInfo.basePrice) - (changeAbs || 0)).toFixed(2)),
-      volume: formatVolume(volume),
-      rawVolume: volume || 0,
-      marketCap: stockInfo.marketCap,
-      peRatio: stockInfo.peRatio,
-      high52: high52 || stockInfo.high52,
-      low52: low52 || stockInfo.low52,
-      perfW: perfW != null ? Number(perfW.toFixed(2)) : 0,
-      perf1M: perf1M != null ? Number(perf1M.toFixed(2)) : 0,
-      perf3M: perf3M != null ? Number(perf3M.toFixed(2)) : 0,
-      perf6M: perf6M != null ? Number(perf6M.toFixed(2)) : 0,
-      perfY: perfY != null ? Number(perfY.toFixed(2)) : 0,
-      sma20: sma20 != null ? Number(sma20.toFixed(2)) : null,
-      sma50: sma50 != null ? Number(sma50.toFixed(2)) : null,
-      sma200: sma200 != null ? Number(sma200.toFixed(2)) : null,
-      rsi: rsi != null ? Number(rsi.toFixed(2)) : null,
-      sector: stockInfo.sector,
-      timestamp: Date.now(),
-      source: 'tradingview_edge',
-    };
-  });
-
-  return parsed;
+  const intervalMs = getAdaptivePollingInterval();
+  centralPollingTimer = setTimeout(async () => {
+    try {
+      await syncTradingViewScanner();
+    } finally {
+      scheduleNextPoll();
+    }
+  }, intervalMs);
 }
 
 /**
@@ -314,17 +463,11 @@ async function fetchTVScanner(market, tickers) {
 function startCentralPolling() {
   if (centralPollingTimer != null || typeof window === 'undefined') return;
 
-  // Initial immediate background sync
+  // Immediate background sync
   syncTradingViewScanner();
 
-  // Run periodic batch sync every 25 seconds
-  centralPollingTimer = setInterval(() => {
-    // Only poll if tab is active and visible
-    if (typeof document !== 'undefined' && document.hidden) {
-      return;
-    }
-    syncTradingViewScanner();
-  }, POLLING_INTERVAL_MS);
+  // Schedule next adaptive poll
+  scheduleNextPoll();
 }
 
 /**
@@ -332,7 +475,7 @@ function startCentralPolling() {
  */
 function stopCentralPolling() {
   if (centralPollingTimer != null) {
-    clearInterval(centralPollingTimer);
+    clearTimeout(centralPollingTimer);
     centralPollingTimer = null;
   }
 }
@@ -358,7 +501,9 @@ if (typeof window !== 'undefined') {
  * Real-Time Market Sync Trigger (Explicit button or manual pull-to-refresh)
  */
 export async function triggerRealTimeSync() {
-  return await syncTradingViewScanner();
+  const result = await syncTradingViewScanner();
+  scheduleNextPoll();
+  return result;
 }
 
 function formatVolume(vol) {

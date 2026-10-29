@@ -159,9 +159,6 @@ export async function searchGlobalEquities(query, marketFilter = 'ALL') {
           exchange: item.exchDisp || item.exchange,
         });
 
-        // Fire background quote fetch to seed live price into runtime store
-        fetchSingleYahooQuote(item.symbol, 3000).catch(() => {});
-
         return {
           symbol: item.symbol,
           ticker,
@@ -193,7 +190,6 @@ export async function searchGlobalEquities(query, marketFilter = 'ALL') {
       price: isInd ? 50 : 100,
       sector: 'Equities',
     });
-    fetchSingleYahooQuote(directSymbol, 3000).catch(() => {});
 
     remoteMatches.push({
       symbol: directSymbol,
