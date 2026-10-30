@@ -11,6 +11,7 @@ import MarketStatusBadge from '../components/MarketStatusBadge';
 import StockChart from '../components/StockChart';
 import WidgetErrorBoundary from '../components/WidgetErrorBoundary';
 import HoldingSparkline from '../components/HoldingSparkline';
+import AdsterraAdBanner from '../components/AdsterraAdBanner';
 import { 
   TrendingUp, 
   TrendingDown, 
@@ -702,6 +703,9 @@ export default function StockDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* Adsterra Sponsored Financial Dispatch (Placement: 6161748 -> Key: 265129238f893cd98f180d1efd562793) */}
+      <AdsterraAdBanner placementId="6161748" adKey="265129238f893cd98f180d1efd562793" className="mt-8 mb-4" />
     </div>
   );
 }

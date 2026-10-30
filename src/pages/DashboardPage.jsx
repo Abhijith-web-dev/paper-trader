@@ -15,6 +15,7 @@ import StockDetailsPanel from '../components/StockDetailsPanel';
 import MarketStatusBadge from '../components/MarketStatusBadge';
 import HoldingSparkline from '../components/HoldingSparkline';
 import TradingPerformance from '../components/TradingPerformance';
+import AdsterraAdBanner from '../components/AdsterraAdBanner';
 import { computeFloatingPositionAccounting, calculatePortfolioStopLossRisk } from '../lib/journalAnalytics';
 import { 
   TrendingUp, 
@@ -2064,6 +2065,9 @@ export default function DashboardPage() {
           })}
         </div>
       </div>
+
+      {/* Adsterra Sponsored Financial Dispatch (Placement: 6161748 -> Key: 265129238f893cd98f180d1efd562793) */}
+      <AdsterraAdBanner placementId="6161748" adKey="265129238f893cd98f180d1efd562793" className="mt-8 mb-4" />
 
       {/* Trade Execution Modal */}
       <TradeModal

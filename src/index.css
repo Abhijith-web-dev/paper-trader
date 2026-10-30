@@ -159,4 +159,16 @@
     border: none;
     max-width: 100%;
   }
+
+  /* Suppress notification-mode and floating push ads on trading terminal pages */
+  body.trading-terminal-active [id*="socialbar"],
+  body.trading-terminal-active [class*="socialbar"],
+  body.trading-terminal-active [id*="push-notification"],
+  body.trading-terminal-active [class*="inpage-push"],
+  body.trading-terminal-active [id*="bauval"],
+  body.trading-terminal-active [class*="bauval"] {
+    display: none !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+  }
 }
