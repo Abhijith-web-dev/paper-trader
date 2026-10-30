@@ -29,9 +29,9 @@ export const ADSTERRA_CONFIG = {
       sublabel: 'Official Adsterra Network Partner'
     },
     popunder: {
-      enabled: true,
-      key: 'd558b6a9096b6007a50019663f7969c3',
-      scriptUrl: 'https://abscloud.org/1/d558b6a9096b6007a50019663f7969c3',
+      enabled: false, // Permanently disabled: zero click-to-open ads / popunders
+      key: null,
+      scriptUrl: null,
       protectTradingAreas: true
     },
     socialBar: {

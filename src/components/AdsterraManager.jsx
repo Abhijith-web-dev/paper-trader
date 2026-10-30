@@ -5,17 +5,11 @@ import { ADSTERRA_CONFIG } from '../config/adsterra';
 /**
  * Adsterra Hybrid Monetization Orchestrator & Trading Shield
  * 
- * Manages active multi-format monetization for paper-trader-001.web.app:
- * 1. Popunder: https://abscloud.org/1/d558b6a9096b6007a50019663f7969c3 (High-CPM Revenue Driver on public routes)
- * 2. Social Bar: https://bauval.org/14/fe7abb4b849d2618628b74d2fbb658ec (In-page push notification on public routes)
- * 3. Banners: Dedicated, non-intrusive broadside banner ads in Dashboard and TradingView views
- * 
- * CORE TRADING PROTECTION:
- * - On /dashboard, /stock/:symbol, and trading terminals:
- *   Notification mode (Social Bar) and Popunder are strictly SUPPRESSED.
- *   Only clean broadside banners are rendered.
- * - All order tickets, Buy/Sell buttons, search inputs, and TradingView chart canvas
- *   are fully protected against click interception.
+ * Rules:
+ * 1. ZERO Popunders / Click-to-open screen ads: Permanently disabled across entire site.
+ * 2. Dedicated, non-intrusive broadside banner ads in Dashboard, TradingView, HomePage, and GuidePage.
+ * 3. Notification-mode ads (Social Bar) strictly suppressed on all trading routes (/dashboard, /stock/*, etc.).
+ * 4. Trading controls (Buy/Sell, order slips, charts, search) are fully protected.
  */
 export default function AdsterraManager({ 
   placementId = ADSTERRA_CONFIG.defaultPlacementId,
@@ -33,7 +27,17 @@ export default function AdsterraManager({
     '/backtest'
   ].includes(pathname) || pathname.startsWith('/stock');
 
-  // Route-aware CSS marker for complete notification suppression
+  // Purge any popunder scripts or click-screen ad tags from DOM
+  useEffect(() => {
+    const popunderScript = document.getElementById('adsterra-popunder-script');
+    if (popunderScript) popunderScript.remove();
+
+    // Remove any script elements pointing to abscloud.org
+    const lingeringPopunders = document.querySelectorAll('script[src*="abscloud.org"]');
+    lingeringPopunders.forEach((el) => el.remove());
+  }, []);
+
+  // Route-aware CSS marker for complete notification suppression on trading pages
   useEffect(() => {
     if (isTradingRoute) {
       document.body.classList.add('trading-terminal-active');
@@ -45,7 +49,7 @@ export default function AdsterraManager({
     };
   }, [isTradingRoute]);
 
-  // 1. Trading Form & Interaction Click Shield
+  // Trading Form & Interaction Click Shield
   useEffect(() => {
     const handleCaptureClick = (e) => {
       const el = e.target;
@@ -56,47 +60,15 @@ export default function AdsterraManager({
       );
 
       if (isTradeCritical) {
-        // Tag event and suppress propagation to background ad listeners
         e.__isTradeProtected = true;
-        if (ADSTERRA_CONFIG.formats.popunder.protectTradingAreas) {
-          e.stopPropagation();
-        }
       }
     };
 
-    // Attach in capture phase before third-party vendor listeners can intercept
     document.addEventListener('click', handleCaptureClick, true);
     return () => document.removeEventListener('click', handleCaptureClick, true);
   }, [isTradingRoute]);
 
-  // 2. Popunder Lifecycle Management (Only on Non-Trading Pages)
-  useEffect(() => {
-    const popunderConfig = ADSTERRA_CONFIG.formats.popunder;
-    if (!popunderConfig.enabled || !popunderConfig.scriptUrl || isTradingRoute) {
-      const existing = document.getElementById('adsterra-popunder-script');
-      if (existing) existing.remove();
-      return;
-    }
-
-    const scriptId = 'adsterra-popunder-script';
-    if (document.getElementById(scriptId)) return;
-
-    const script = document.createElement('script');
-    script.id = scriptId;
-    script.type = 'text/javascript';
-    script.src = popunderConfig.scriptUrl;
-    script.setAttribute('data-cfasync', 'false');
-    script.async = true;
-
-    document.head.appendChild(script);
-
-    return () => {
-      const existing = document.getElementById(scriptId);
-      if (existing) existing.remove();
-    };
-  }, [isTradingRoute]);
-
-  // 3. Social Bar Lifecycle Management (Only on Non-Trading Pages - Never in Dashboard or TradingView)
+  // Social Bar Lifecycle Management (Only on Non-Trading Pages - Never in Dashboard or TradingView)
   useEffect(() => {
     const socialBarConfig = ADSTERRA_CONFIG.formats.socialBar;
     if (!socialBarConfig.enabled || !socialBarConfig.scriptUrl || isTradingRoute) {
