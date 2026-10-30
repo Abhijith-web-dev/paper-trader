@@ -4,10 +4,10 @@ import { ADSTERRA_CONFIG } from '../config/adsterra';
 /**
  * Adsterra Hybrid Monetization Orchestrator & Trading Shield
  * 
- * Manages multi-format monetization recommended by Adsterra:
- * - Popunder (Highest CPM revenue engine)
- * - Social Bar (In-page notification & engagement)
- * - Banner (Display ads on non-critical informational pages)
+ * Manages active multi-format monetization for paper-trader-001.web.app:
+ * 1. Popunder: https://abscloud.org/1/d558b6a9096b6007a50019663f7969c3 (High-CPM Revenue Driver)
+ * 2. Social Bar: https://bauval.org/14/fe7abb4b849d2618628b74d2fbb658ec (Dynamic In-Page Push)
+ * 3. Banners: Broadsheet photo-plate slots with bauval.org ad delivery
  * 
  * CORE TRADING PROTECTION:
  * Ensures popunders and ad overlays NEVER trigger on trading operations:
@@ -45,7 +45,7 @@ export default function AdsterraManager({
     return () => document.removeEventListener('click', handleCaptureClick, true);
   }, []);
 
-  // 2. Popunder Lifecycle Management
+  // 2. Popunder Lifecycle Management (abscloud.org)
   useEffect(() => {
     const popunderConfig = ADSTERRA_CONFIG.formats.popunder;
     if (!popunderConfig.enabled || !popunderConfig.scriptUrl) return;
@@ -57,6 +57,7 @@ export default function AdsterraManager({
     script.id = scriptId;
     script.type = 'text/javascript';
     script.src = popunderConfig.scriptUrl;
+    script.setAttribute('data-cfasync', 'false');
     script.async = true;
 
     document.head.appendChild(script);
@@ -69,7 +70,7 @@ export default function AdsterraManager({
     };
   }, []);
 
-  // 3. Social Bar Lifecycle Management
+  // 3. Social Bar Lifecycle Management (bauval.org)
   useEffect(() => {
     const socialBarConfig = ADSTERRA_CONFIG.formats.socialBar;
     if (!socialBarConfig.enabled || !socialBarConfig.scriptUrl) return;
@@ -81,6 +82,7 @@ export default function AdsterraManager({
     script.id = scriptId;
     script.type = 'text/javascript';
     script.src = socialBarConfig.scriptUrl;
+    script.setAttribute('data-cfasync', 'false');
     script.async = true;
 
     document.body.appendChild(script);

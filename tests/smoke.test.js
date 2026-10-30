@@ -557,10 +557,10 @@ console.log('  Testing Adsterra Placement & Cryptographic Hash Key Mapping Invar
   // 14.1 Resolution by placement ID
   const resolvedByPlacement = resolveAdsterraPlacement({ placementId: '6161748' });
   assert.equal(resolvedByPlacement.placementId, '6161748');
-  assert.equal(resolvedByPlacement.hashKey, '0267c3fa8d2c31053771bd95208e1ce8');
-  assert.equal(resolvedByPlacement.width, 728);
-  assert.equal(resolvedByPlacement.height, 90);
-  assert.equal(resolvedByPlacement.scriptUrl, '//www.highperformanceformat.com/0267c3fa8d2c31053771bd95208e1ce8/invoke.js');
+  assert.equal(resolvedByPlacement.hashKey, '265129238f893cd98f180d1efd562793');
+  assert.equal(resolvedByPlacement.width, 468);
+  assert.equal(resolvedByPlacement.height, 60);
+  assert.equal(resolvedByPlacement.scriptUrl, 'https://bauval.org/22/265129238f893cd98f180d1efd562793');
 
   // 14.2 Mobile responsive sizing
   const resolvedMobile = resolveAdsterraPlacement({ placementId: '6161748', isMobile: true });
@@ -573,13 +573,15 @@ console.log('  Testing Adsterra Placement & Cryptographic Hash Key Mapping Invar
   // 14.4 Default fallback resilience
   const fallback = resolveAdsterraPlacement();
   assert.equal(fallback.hashKey, ADSTERRA_CONFIG.defaultHashKey);
-  assert.equal(fallback.hashKey, '0267c3fa8d2c31053771bd95208e1ce8');
+  assert.equal(fallback.hashKey, '265129238f893cd98f180d1efd562793');
 
   // 14.5 Multi-format configuration invariants (Popunder + Social Bar + Banner)
   assert.equal(ADSTERRA_CONFIG.formats.banner.enabled, true);
+  assert.equal(ADSTERRA_CONFIG.formats.popunder.enabled, true);
+  assert.equal(ADSTERRA_CONFIG.formats.socialBar.enabled, true);
   assert.equal(ADSTERRA_CONFIG.formats.popunder.protectTradingAreas, true);
-  configureAdFormat('popunder', { scriptUrl: '//example.com/pop.js' });
-  assert.equal(ADSTERRA_CONFIG.formats.popunder.scriptUrl, '//example.com/pop.js');
+  assert.equal(ADSTERRA_CONFIG.formats.popunder.scriptUrl, 'https://abscloud.org/1/d558b6a9096b6007a50019663f7969c3');
+  assert.equal(ADSTERRA_CONFIG.formats.socialBar.scriptUrl, 'https://bauval.org/14/fe7abb4b849d2618628b74d2fbb658ec');
 }
 console.log('  ✅ Adsterra Placement & Cryptographic Hash Key Mapping Invariants passed.');
 

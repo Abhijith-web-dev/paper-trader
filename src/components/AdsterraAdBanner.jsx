@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { resolveAdsterraPlacement } from '../config/adsterra';
+import { resolveAdsterraPlacement, ADSTERRA_CONFIG } from '../config/adsterra';
 
 /**
  * Adsterra Responsive Broadside Banner Component
@@ -9,8 +9,8 @@ import { resolveAdsterraPlacement } from '../config/adsterra';
  * the ad network with a legitimate top-level origin (paper-trader-001.web.app).
  */
 export default function AdsterraAdBanner({ 
-  placementId = '6161748',
-  adKey = '0267c3fa8d2c31053771bd95208e1ce8',
+  placementId = ADSTERRA_CONFIG.defaultPlacementId,
+  adKey = ADSTERRA_CONFIG.defaultHashKey,
   className = '' 
 }) {
   const [isMobile, setIsMobile] = useState(false);
@@ -25,7 +25,7 @@ export default function AdsterraAdBanner({
   }, []);
 
   const config = resolveAdsterraPlacement({ placementId, adKey, isMobile });
-  const iframeSrc = `/adsterra-banner.html?key=${encodeURIComponent(config.hashKey)}&width=${config.width}&height=${config.height}`;
+  const iframeSrc = `/adsterra-banner.html?key=${encodeURIComponent(config.hashKey)}&width=${config.width}&height=${config.height}&script=${encodeURIComponent(config.scriptUrl)}`;
 
   return (
     <aside 
@@ -47,7 +47,7 @@ export default function AdsterraAdBanner({
         </div>
 
         {/* Real Same-Origin Sandbox Frame */}
-        <div className="min-h-[50px] md:min-h-[90px] w-full flex items-center justify-center overflow-hidden bg-white/40 border border-dashed border-[#D8D2C4] py-1">
+        <div className="min-h-[50px] md:min-h-[60px] w-full flex items-center justify-center overflow-hidden bg-white/40 border border-dashed border-[#D8D2C4] py-1">
           <iframe 
             key={`${config.hashKey}-${config.width}-${config.height}`}
             src={iframeSrc}

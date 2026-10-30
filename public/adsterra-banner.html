@@ -23,9 +23,10 @@
   <script type="text/javascript">
     (function() {
       var urlParams = new URLSearchParams(window.location.search);
-      var key = urlParams.get('key') || '0267c3fa8d2c31053771bd95208e1ce8';
-      var width = parseInt(urlParams.get('width') || '728', 10);
-      var height = parseInt(urlParams.get('height') || '90', 10);
+      var key = urlParams.get('key') || '265129238f893cd98f180d1efd562793';
+      var width = parseInt(urlParams.get('width') || '468', 10);
+      var height = parseInt(urlParams.get('height') || '60', 10);
+      var scriptUrl = urlParams.get('script') || ('https://bauval.org/22/' + encodeURIComponent(key));
 
       // Standard iframe options configuration
       window.atOptions = {
@@ -46,7 +47,7 @@
       };
 
       // Synchronous document.write during initial HTML page parsing
-      document.write('<script type="text/javascript" src="//www.highperformanceformat.com/' + encodeURIComponent(key) + '/invoke.js"><\/script>');
+      document.write('<script type="text/javascript" src="' + scriptUrl + '"><\/script>');
     })();
   </script>
 </body>

@@ -243,8 +243,8 @@ export default function App() {
               </main>
             </ErrorBoundary>
             
-            {/* Adsterra Monetization Engine & UX Protection (Placement: 6161748 -> Key: 0267c3fa8d2c31053771bd95208e1ce8) */}
-            <AdsterraManager placementId="6161748" adKey="0267c3fa8d2c31053771bd95208e1ce8" />
+            {/* Adsterra Hybrid Monetization Engine (Popunder + Social Bar + Banners) */}
+            <AdsterraManager placementId="6161748" adKey="265129238f893cd98f180d1efd562793" />
             
             {/* Authentic Vintage Broadsheet Footer */}
             <footer className="border-t-4 border-double border-[#111111] bg-[#F6F4EE] py-6 px-4 text-center text-xs font-mono text-[#111111]">
