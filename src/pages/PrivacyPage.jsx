@@ -101,7 +101,7 @@ export default function PrivacyPage() {
           </h2>
           <div className="space-y-2 font-news text-sm leading-relaxed text-[#111111]/80">
             <p>
-              To maintain free access to our simulated paper trading platform, we may display contextual partner notices through authorized advertising networks (such as Monetag).
+              To maintain free access to our simulated paper trading platform, we may display contextual partner notices through authorized advertising networks (such as Adsterra).
             </p>
             <p>
               <strong>Strict Financial Privacy Firewall:</strong> Under no circumstances is user trading activity, simulated portfolio balances, order tickets, stop-loss thresholds, transaction history, journal reflections, or authentication records shared, transmitted, or made accessible to advertising networks or third-party marketers.

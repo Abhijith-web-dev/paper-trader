@@ -4,7 +4,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { TradingToolsProvider } from './context/TradingToolsContext';
 import { Toaster } from 'sonner';
 import Navbar from './components/Navbar';
-import MonetagAdManager from './components/MonetagAdManager';
+import AdsterraManager from './components/AdsterraManager';
 import { ExternalLink } from 'lucide-react';
 import { lazyWithRetry } from './lib/lazyWithRetry';
 
@@ -243,8 +243,8 @@ export default function App() {
               </main>
             </ErrorBoundary>
             
-            {/* Monetag Ads Monetization: In-Page Push & Vignette Interstitial Manager */}
-            <MonetagAdManager />
+            {/* Adsterra Monetization Engine & UX Protection (Placement ID: 6161748) */}
+            <AdsterraManager placementId="6161748" />
             
             {/* Authentic Vintage Broadsheet Footer */}
             <footer className="border-t-4 border-double border-[#111111] bg-[#F6F4EE] py-6 px-4 text-center text-xs font-mono text-[#111111]">

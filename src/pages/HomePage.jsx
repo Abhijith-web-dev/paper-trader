@@ -6,6 +6,7 @@ import { STOCK_DIRECTORY, getInstantInitialQuotes } from '../lib/yahooFinance';
 import { subscribeToMarketStream } from '../lib/omniFeed';
 import { getNSEMarketStatus, getUSMarketStatus } from '../lib/marketHours';
 import MarketStatusBadge from '../components/MarketStatusBadge';
+import AdsterraAdBanner from '../components/AdsterraAdBanner';
 import { 
   TrendingUp, 
   TrendingDown, 
@@ -1566,6 +1567,9 @@ export default function HomePage() {
           })}
         </div>
       </div>
+
+      {/* Adsterra Sponsored Financial Dispatch (Placement ID: 6161748) */}
+      <AdsterraAdBanner placementId="6161748" />
 
       {/* ============================================================== */}
       {/* 4-COLUMN BROADSHEET FEATURE PILLARS BANNER                     */}

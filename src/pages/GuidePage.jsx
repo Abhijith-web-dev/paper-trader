@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
+import AdsterraAdBanner from '../components/AdsterraAdBanner';
 import { 
   GraduationCap, 
   BookOpen, 
@@ -213,6 +214,9 @@ export default function GuidePage() {
           ))}
         </div>
       </div>
+
+      {/* Adsterra Sponsored Financial Dispatch (Placement ID: 6161748) */}
+      <AdsterraAdBanner placementId="6161748" />
 
       {/* Bottom Dispatch Footer */}
       <div className="pt-4 border-t-2 border-[#111111] space-y-3 font-mono text-xs">

@@ -152,48 +152,11 @@
     text-shadow: 0 0 5px rgba(248, 250, 252, 0.4);
   }
 
-  /* 1. Permanent Removal & Site-Wide Suppression of In-Page Push (IPP) */
-  #monetag-ad-slot,
-  #monetag-zone-12144413,
-  [class*="ipp-"],
-  [id*="ipp-"],
-  [class*="inpage-push"],
-  [id*="inpage-push"],
-  [class*="monetag-ipp"],
-  [class*="pp-inpage"],
-  [id*="pp-inpage"] {
-    display: none !important;
-    visibility: hidden !important;
-    opacity: 0 !important;
-    pointer-events: none !important;
-    height: 0 !important;
-    width: 0 !important;
-    position: absolute !important;
-    left: -9999px !important;
-    top: -9999px !important;
-    z-index: -9999 !important;
-  }
-
-  /* 2. Suppression of Middle / Vignette / Interstitial Ads on the Front Page */
-  body.is-front-page [class*="vignette"],
-  body.is-front-page [id*="vignette"],
-  body.is-front-page [class*="interstitial"],
-  body.is-front-page [id*="interstitial"],
-  body.is-front-page #monetag-vignette-zone,
-  body:has(.front-page-container) [class*="vignette"],
-  body:has(.front-page-container) [id*="vignette"],
-  body:has(.front-page-container) [class*="interstitial"],
-  body:has(.front-page-container) [id*="interstitial"],
-  body:has(.front-page-container) #monetag-vignette-zone {
-    display: none !important;
-    visibility: hidden !important;
-    opacity: 0 !important;
-    pointer-events: none !important;
-    height: 0 !important;
-    width: 0 !important;
-    position: absolute !important;
-    left: -9999px !important;
-    top: -9999px !important;
-    z-index: -9999 !important;
+  /* Adsterra Sponsored Financial Dispatch Container */
+  .adsterra-banner-wrapper iframe {
+    display: block;
+    margin: 0 auto;
+    border: none;
+    max-width: 100%;
   }
 }
