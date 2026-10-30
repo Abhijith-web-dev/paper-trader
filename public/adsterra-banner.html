@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sponsored Financial Dispatch</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: transparent;
+      overflow: hidden;
+    }
+  </style>
+</head>
+<body>
+  <div id="adsterra-slot"></div>
+  <script type="text/javascript">
+    (function() {
+      var urlParams = new URLSearchParams(window.location.search);
+      var key = urlParams.get('key') || '0267c3fa8d2c31053771bd95208e1ce8';
+      var width = parseInt(urlParams.get('width') || '728', 10);
+      var height = parseInt(urlParams.get('height') || '90', 10);
+
+      // Standard iframe options configuration
+      window.atOptions = {
+        'key' : key,
+        'format' : 'iframe',
+        'height' : height,
+        'width' : width,
+        'params' : {}
+      };
+
+      // Asynchronous container options configuration
+      window.atAsyncOptions = {
+        'key' : key,
+        'format' : 'js',
+        'async' : true,
+        'container' : 'adsterra-slot',
+        'params' : {}
+      };
+
+      // Synchronous document.write during initial HTML page parsing
+      document.write('<script type="text/javascript" src="//www.highperformanceformat.com/' + encodeURIComponent(key) + '/invoke.js"><\/script>');
+    })();
+  </script>
+</body>
+</html>

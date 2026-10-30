@@ -1,91 +1,31 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { resolveAdsterraPlacement } from '../config/adsterra';
 
 /**
  * Adsterra Responsive Broadside Banner Component
  * 
- * Securely encapsulates Adsterra ad serving (Placement: 6161748 -> Key: 0267c3fa8d2c31053771bd95208e1ce8)
- * within an isolated sub-document iframe to protect React's virtual DOM against document.write overrides.
- * 
- * Styled in vintage broadsheet newspaper aesthetic to integrate seamlessly with Paper Trading.
+ * Safely loads Adsterra ad creatives via an isolated same-origin document (/adsterra-banner.html).
+ * This completely isolates React's virtual DOM against document.write overrides while providing
+ * the ad network with a legitimate top-level origin (paper-trader-001.web.app).
  */
 export default function AdsterraAdBanner({ 
   placementId = '6161748',
   adKey = '0267c3fa8d2c31053771bd95208e1ce8',
   className = '' 
 }) {
-  const containerRef = useRef(null);
+  const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
-
-    // Clear previous ad instance on re-render
-    container.innerHTML = '';
-
-    const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
-    const config = resolveAdsterraPlacement({ placementId, adKey, isMobile });
-
-    // Create sandboxed sub-document iframe
-    const iframe = document.createElement('iframe');
-    iframe.style.width = `${config.width}px`;
-    iframe.style.height = `${config.height}px`;
-    iframe.style.border = 'none';
-    iframe.style.overflow = 'hidden';
-    iframe.scrolling = 'no';
-    iframe.setAttribute('title', config.label);
-    iframe.setAttribute('loading', 'lazy');
-
-    container.appendChild(iframe);
-
-    try {
-      const doc = iframe.contentWindow?.document || iframe.contentDocument;
-      if (doc) {
-        doc.open();
-        doc.write(`
-          <!DOCTYPE html>
-          <html>
-          <head>
-            <meta charset="utf-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1">
-            <style>
-              body {
-                margin: 0;
-                padding: 0;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                background-color: transparent;
-                overflow: hidden;
-              }
-            </style>
-          </head>
-          <body>
-            <script type="text/javascript">
-              atOptions = {
-                'key' : '${config.hashKey}',
-                'format' : '${config.format}',
-                'height' : ${config.height},
-                'width' : ${config.width},
-                'params' : {}
-              };
-            </script>
-            <script type="text/javascript" src="${config.scriptUrl}"></script>
-          </body>
-          </html>
-        `);
-        doc.close();
-      }
-    } catch {
-      // Safe failover for restricted iframe contexts
-    }
-
-    return () => {
-      if (container) {
-        container.innerHTML = '';
-      }
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
     };
-  }, [placementId, adKey]);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  const config = resolveAdsterraPlacement({ placementId, adKey, isMobile });
+  const iframeSrc = `/adsterra-banner.html?key=${encodeURIComponent(config.hashKey)}&width=${config.width}&height=${config.height}`;
 
   return (
     <aside 
@@ -106,11 +46,19 @@ export default function AdsterraAdBanner({
           </div>
         </div>
 
-        {/* Dynamic Ad Slot Frame */}
-        <div 
-          ref={containerRef}
-          className="min-h-[50px] md:min-h-[90px] w-full flex items-center justify-center overflow-hidden bg-white/40 border border-dashed border-[#D8D2C4] py-1"
-        />
+        {/* Real Same-Origin Sandbox Frame */}
+        <div className="min-h-[50px] md:min-h-[90px] w-full flex items-center justify-center overflow-hidden bg-white/40 border border-dashed border-[#D8D2C4] py-1">
+          <iframe 
+            key={`${config.hashKey}-${config.width}-${config.height}`}
+            src={iframeSrc}
+            title={config.label}
+            width={config.width}
+            height={config.height}
+            className="border-0 overflow-hidden"
+            scrolling="no"
+            loading="lazy"
+          />
+        </div>
 
         {/* Footer Attribution Micro-bar */}
         <div className="flex items-center justify-between pt-1.5 mt-2 border-t border-dashed border-[#D8D2C4] text-[9px] text-[#111111]/50 uppercase tracking-wider">
