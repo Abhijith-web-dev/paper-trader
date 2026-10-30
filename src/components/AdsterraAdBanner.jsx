@@ -57,6 +57,7 @@ export default function AdsterraAdBanner({
             className="border-0 overflow-hidden"
             scrolling="no"
             loading="lazy"
+            sandbox="allow-scripts allow-same-origin allow-popups"
           />
         </div>
 

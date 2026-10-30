@@ -35,9 +35,9 @@ export const ADSTERRA_CONFIG = {
       protectTradingAreas: true
     },
     socialBar: {
-      enabled: true,
-      key: 'fe7abb4b849d2618628b74d2fbb658ec',
-      scriptUrl: 'https://bauval.org/14/fe7abb4b849d2618628b74d2fbb658ec'
+      enabled: false, // Disabled: prevents adult dating and sensitive push notifications
+      key: null,
+      scriptUrl: null
     },
     native: {
       enabled: true,

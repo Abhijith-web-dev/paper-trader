@@ -575,11 +575,10 @@ console.log('  Testing Adsterra Placement & Cryptographic Hash Key Mapping Invar
   assert.equal(fallback.hashKey, ADSTERRA_CONFIG.defaultHashKey);
   assert.equal(fallback.hashKey, '265129238f893cd98f180d1efd562793');
 
-  // 14.5 Multi-format configuration invariants (Popunder disabled per user request, Social Bar & Banner enabled)
+  // 14.5 Multi-format configuration invariants (Popunder & Social Bar disabled for adult/intrusive ad protection, clean Banners enabled)
   assert.equal(ADSTERRA_CONFIG.formats.banner.enabled, true);
   assert.equal(ADSTERRA_CONFIG.formats.popunder.enabled, false, 'Popunder / click-screen ads must be disabled');
-  assert.equal(ADSTERRA_CONFIG.formats.socialBar.enabled, true);
-  assert.equal(ADSTERRA_CONFIG.formats.socialBar.scriptUrl, 'https://bauval.org/14/fe7abb4b849d2618628b74d2fbb658ec');
+  assert.equal(ADSTERRA_CONFIG.formats.socialBar.enabled, false, 'Social Bar disabled to prevent adult push/chat ads');
 }
 console.log('  ✅ Adsterra Placement & Cryptographic Hash Key Mapping Invariants passed.');
 

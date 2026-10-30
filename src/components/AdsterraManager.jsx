@@ -27,13 +27,16 @@ export default function AdsterraManager({
     '/backtest'
   ].includes(pathname) || pathname.startsWith('/stock');
 
-  // Purge any popunder scripts or click-screen ad tags from DOM
+  // Purge any popunder scripts, adult push notifications, or click-screen ad tags from DOM
   useEffect(() => {
     const popunderScript = document.getElementById('adsterra-popunder-script');
     if (popunderScript) popunderScript.remove();
 
-    // Remove any script elements pointing to abscloud.org
-    const lingeringPopunders = document.querySelectorAll('script[src*="abscloud.org"]');
+    const socialbarScript = document.getElementById('adsterra-socialbar-script');
+    if (socialbarScript) socialbarScript.remove();
+
+    // Remove any script elements pointing to abscloud.org (popunder) or adult social bars
+    const lingeringPopunders = document.querySelectorAll('script[src*="abscloud.org"], script[src*="fe7abb4b849d2618628b74d2fbb658ec"]');
     lingeringPopunders.forEach((el) => el.remove());
   }, []);
 
