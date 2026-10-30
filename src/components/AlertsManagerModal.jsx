@@ -156,6 +156,13 @@ export default function AlertsManagerModal({ isOpen, onClose, currentStock }) {
       const res = await Notification.requestPermission();
       setNotificationPermission(res);
       if (res === 'granted') {
+        if ('serviceWorker' in navigator) {
+          try {
+            await navigator.serviceWorker.register('/sw.js');
+          } catch {
+            // Service worker registration optional failover
+          }
+        }
         toast.success('Browser notifications enabled! You will be alerted on price triggers.');
       } else if (res === 'denied') {
         toast.error('Notifications blocked. Please permit notifications in your browser settings.');

@@ -93,11 +93,30 @@ export default function PrivacyPage() {
           </p>
         </section>
 
-        {/* Section 4: Data Erasure & Vault */}
+        {/* Section 4: Advertising & Partner Disclosures */}
         <section className="space-y-2">
           <h2 className="font-serif font-black text-base uppercase text-[#111111] flex items-center gap-2 border-b border-neutral-300 pb-1">
             <span className="w-2 h-2 bg-[#111111]"></span>
-            <span>4. Right to Data Erasure & Local Vault Export</span>
+            <span>4. Advertising & Partner Disclosures (Zero Trading Data Sharing)</span>
+          </h2>
+          <div className="space-y-2 font-news text-sm leading-relaxed text-[#111111]/80">
+            <p>
+              To maintain free access to our simulated paper trading platform, we may display contextual partner notices through authorized advertising networks (such as Monetag).
+            </p>
+            <p>
+              <strong>Strict Financial Privacy Firewall:</strong> Under no circumstances is user trading activity, simulated portfolio balances, order tickets, stop-loss thresholds, transaction history, journal reflections, or authentication records shared, transmitted, or made accessible to advertising networks or third-party marketers.
+            </p>
+            <p>
+              <strong>Push Notifications & Opt-in:</strong> Browser push notifications for market alerts are strictly opt-in and require explicit user consent via browser prompts. You may revoke notification permissions at any time through your browser's site settings.
+            </p>
+          </div>
+        </section>
+
+        {/* Section 5: Data Erasure & Vault */}
+        <section className="space-y-2">
+          <h2 className="font-serif font-black text-base uppercase text-[#111111] flex items-center gap-2 border-b border-neutral-300 pb-1">
+            <span className="w-2 h-2 bg-[#111111]"></span>
+            <span>5. Right to Data Erasure & Local Vault Export</span>
           </h2>
           <p className="font-news text-sm leading-relaxed text-[#111111]/80">
             You hold total control over your practice records. At any point, you can download a full unencrypted or AES-256 encrypted JSON backup of your practice history, or wipe all records clean via the Encrypted Vault modal or Account Settings.

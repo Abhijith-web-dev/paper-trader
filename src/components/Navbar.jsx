@@ -180,7 +180,6 @@ export default function Navbar() {
             {/* Terminal Command Button - Compact square on mobile, full on tablet/desktop */}
             <button
               type="button"
-              data-no-popunder="true"
               onClick={openPalette}
               className="flex items-center justify-center gap-1.5 p-2 sm:px-3 sm:py-1.5 bg-[#111111] text-[#F6F4EE] border border-[#111111] hover:bg-neutral-800 text-xs font-mono font-bold transition-all shadow-xs cursor-pointer min-h-[34px] sm:min-h-[38px] min-w-[34px] sm:min-w-auto"
               title="Summon Natural Trading Command Terminal (Press / or Ctrl+K)"

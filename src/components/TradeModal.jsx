@@ -337,10 +337,7 @@ export default function TradeModal({
   };
 
   return (
-    <div 
-      className="trade-modal-container fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/60 backdrop-blur-xs overflow-y-auto animate-in fade-in duration-150" 
-      data-no-popunder="true"
-    >
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/60 backdrop-blur-xs overflow-y-auto animate-in fade-in duration-150">
       <div className="newspaper-photo-plate bg-[#F6F4EE] border-4 border-[#111111] shadow-[8px_8px_0px_#111111] w-full max-w-lg max-h-[94vh] overflow-y-auto p-4 sm:p-6 relative font-mono text-xs my-auto text-[#111111]">
         
         {/* Close Button */}

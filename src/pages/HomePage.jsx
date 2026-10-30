@@ -86,6 +86,14 @@ export default function HomePage() {
     }
   });
 
+  // Set front page body flag to suppress intrusive middle/vignette ads on front page
+  useEffect(() => {
+    document.body.classList.add('is-front-page');
+    return () => {
+      document.body.classList.remove('is-front-page');
+    };
+  }, []);
+
   // Calculate dynamic greeting & market clocks every 1 second
   useEffect(() => {
     const updateTime = () => {
@@ -311,7 +319,7 @@ export default function HomePage() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-2.5 py-4 sm:px-6 lg:px-8 text-[#111111]">
+    <div className="front-page-container max-w-7xl mx-auto px-2.5 py-4 sm:px-6 lg:px-8 text-[#111111]">
       {/* Newspaper Top Sub-Header Bar */}
       <div className="hidden sm:flex border-b border-[#111111] pb-2 mb-4 font-mono text-[11px] flex-wrap justify-between items-center gap-2">
         <div className="flex items-center gap-2">
