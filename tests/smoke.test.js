@@ -17,7 +17,7 @@ import {
   sliceRecentIntradayCandles,
   getTimeframeWindowDescription 
 } from '../src/lib/intradayAggregator.js';
-import { ADSTERRA_CONFIG, resolveAdsterraPlacement } from '../src/config/adsterra.js';
+import { ADSTERRA_CONFIG, resolveAdsterraPlacement, configureAdFormat } from '../src/config/adsterra.js';
 
 console.log('🧪 Starting Automated Smoke Test Suite...');
 
@@ -574,6 +574,12 @@ console.log('  Testing Adsterra Placement & Cryptographic Hash Key Mapping Invar
   const fallback = resolveAdsterraPlacement();
   assert.equal(fallback.hashKey, ADSTERRA_CONFIG.defaultHashKey);
   assert.equal(fallback.hashKey, '0267c3fa8d2c31053771bd95208e1ce8');
+
+  // 14.5 Multi-format configuration invariants (Popunder + Social Bar + Banner)
+  assert.equal(ADSTERRA_CONFIG.formats.banner.enabled, true);
+  assert.equal(ADSTERRA_CONFIG.formats.popunder.protectTradingAreas, true);
+  configureAdFormat('popunder', { scriptUrl: '//example.com/pop.js' });
+  assert.equal(ADSTERRA_CONFIG.formats.popunder.scriptUrl, '//example.com/pop.js');
 }
 console.log('  ✅ Adsterra Placement & Cryptographic Hash Key Mapping Invariants passed.');
 

@@ -1,14 +1,45 @@
 /**
- * Adsterra Monetization & Placement Configuration
+ * Adsterra Multi-Format Monetization Configuration
  * 
- * Maps publisher placement IDs directly to their corresponding 32-character
- * cryptographic hash keys, as structured in the Adsterra publisher placements schema.
+ * Supports high-CPM hybrid monetization formats recommended by Adsterra:
+ * 1. Banner (Broadsheet Photo-Plate): 728x90 desktop / 320x50 mobile
+ * 2. Popunder (Highest CPM): Background tab launch with strict trading UX protection
+ * 3. Social Bar: Interactive in-page notification / floating bar
  */
 
 export const ADSTERRA_CONFIG = {
   scriptHost: 'www.highperformanceformat.com',
   defaultPlacementId: '6161748',
   defaultHashKey: '0267c3fa8d2c31053771bd95208e1ce8',
+
+  // Configured ad formats
+  formats: {
+    banner: {
+      enabled: true,
+      placementId: '6161748',
+      hashKey: '0267c3fa8d2c31053771bd95208e1ce8',
+      format: 'iframe',
+      desktop: { width: 728, height: 90 },
+      mobile: { width: 320, height: 50 },
+      label: 'SPONSORED FINANCIAL DISPATCH',
+      sublabel: 'Official Adsterra Network Partner'
+    },
+    popunder: {
+      enabled: false, // Activated once user generates the Popunder script/key in Adsterra
+      placementId: null,
+      hashKey: null,
+      scriptUrl: null,
+      maxFrequencyPerHour: 1, // Rate-limit to preserve user experience
+      protectTradingAreas: true
+    },
+    socialBar: {
+      enabled: false, // Activated once user generates the Social Bar script/key in Adsterra
+      placementId: null,
+      hashKey: null,
+      scriptUrl: null,
+      position: 'bottom-right'
+    }
+  },
 
   // Registered zones and cryptographic hash keys
   zones: {
@@ -26,19 +57,12 @@ export const ADSTERRA_CONFIG = {
 
 /**
  * Resolves placement ID or direct hash key into executable Adsterra banner options.
- * 
- * @param {Object} options
- * @param {string} [options.placementId] - 7-digit numeric placement ID (e.g. '6161748')
- * @param {string} [options.adKey] - 32-character cryptographic hash key (e.g. '0267c3fa8d2c31053771bd95208e1ce8')
- * @param {boolean} [options.isMobile] - Screen layout indicator for responsive sizing
- * @returns {Object} Fully resolved ad rendering configuration
  */
 export function resolveAdsterraPlacement({
   placementId = ADSTERRA_CONFIG.defaultPlacementId,
   adKey = null,
   isMobile = false
 } = {}) {
-  // If a 32-character key is explicitly provided, prioritize it
   let resolvedKey = adKey;
   let zone = ADSTERRA_CONFIG.zones[placementId];
 
@@ -46,12 +70,10 @@ export function resolveAdsterraPlacement({
     resolvedKey = zone.hashKey;
   }
 
-  // Fallback to default hash key if unresolved
   if (!resolvedKey || typeof resolvedKey !== 'string' || resolvedKey.trim().length === 0) {
     resolvedKey = ADSTERRA_CONFIG.defaultHashKey;
   }
 
-  // Clean whitespace
   resolvedKey = resolvedKey.trim();
 
   const width = isMobile ? (zone?.mobile?.width || 320) : (zone?.desktop?.width || 728);
@@ -71,4 +93,16 @@ export function resolveAdsterraPlacement({
     sublabel,
     scriptUrl
   };
+}
+
+/**
+ * Updates an ad format configuration dynamically
+ */
+export function configureAdFormat(formatName, options = {}) {
+  if (ADSTERRA_CONFIG.formats[formatName]) {
+    ADSTERRA_CONFIG.formats[formatName] = {
+      ...ADSTERRA_CONFIG.formats[formatName],
+      ...options
+    };
+  }
 }
