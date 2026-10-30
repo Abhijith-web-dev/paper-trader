@@ -8,12 +8,13 @@ import MonetagAdManager from './components/MonetagAdManager';
 import { ExternalLink } from 'lucide-react';
 import { lazyWithRetry } from './lib/lazyWithRetry';
 
-// Code-split pages wrapped with auto-recovering chunk loader for deployment resilience
-const HomePage = lazyWithRetry(() => import('./pages/HomePage'), 'HomePage');
+import HomePage from './pages/HomePage';
+import DashboardPage from './pages/DashboardPage';
+
+// Code-split secondary views wrapped with auto-recovering chunk loader for deployment resilience
 const LoginPage = lazyWithRetry(() => import('./pages/LoginPage'), 'LoginPage');
 const SignupPage = lazyWithRetry(() => import('./pages/SignupPage'), 'SignupPage');
 const OnboardingPage = lazyWithRetry(() => import('./pages/OnboardingPage'), 'OnboardingPage');
-const DashboardPage = lazyWithRetry(() => import('./pages/DashboardPage'), 'DashboardPage');
 const StockDetailPage = lazyWithRetry(() => import('./pages/StockDetailPage'), 'StockDetailPage');
 const JournalPage = lazyWithRetry(() => import('./pages/JournalPage'), 'JournalPage');
 const ScreenerPage = lazyWithRetry(() => import('./pages/ScreenerPage'), 'ScreenerPage');
@@ -66,10 +67,13 @@ class ErrorBoundary extends Component {
             </div>
             <div className="flex flex-wrap gap-2 justify-center pt-2">
               <button
-                onClick={() => window.location.reload()}
+                onClick={() => {
+                  sessionStorage.clear();
+                  window.location.href = window.location.pathname + '?t=' + Date.now();
+                }}
                 className="px-4 py-2 bg-[#111111] text-[#F6F4EE] font-bold text-xs hover:bg-neutral-800 transition-colors cursor-pointer"
               >
-                Reload Terminal
+                Reload Fresh Terminal
               </button>
               <button
                 onClick={() => {

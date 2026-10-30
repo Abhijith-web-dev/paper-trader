@@ -36,13 +36,14 @@ export function lazyWithRetry(componentImport, componentName = 'component') {
 
       if (isChunkError && !hasRetried) {
         window.sessionStorage.setItem(storageKey, 'true');
-        console.info(`[ModuleLoader] New deployment detected. Reloading to fetch latest application chunks...`);
-        window.location.reload();
-        // Return an empty promise to prevent rendering crash while reload executes
+        console.info(`[ModuleLoader] New deployment detected. Reloading with fresh cache for ${componentName}...`);
+        // Bypass cached index.html by appending cache-busting timestamp
+        const cleanPath = window.location.pathname;
+        window.location.href = cleanPath + (cleanPath.includes('?') ? '&' : '?') + 't=' + Date.now();
         return new Promise(() => {});
       }
 
-      // If already retried and still failing, throw to ErrorBoundary
+      // If already retried and still failing, clean up storage key and surface to ErrorBoundary
       window.sessionStorage.removeItem(storageKey);
       throw error;
     }
