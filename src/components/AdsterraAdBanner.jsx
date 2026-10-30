@@ -1,16 +1,17 @@
 import React, { useEffect, useRef } from 'react';
+import { resolveAdsterraPlacement } from '../config/adsterra';
 
 /**
  * Adsterra Responsive Broadside Banner Component
  * 
- * Securely encapsulates Adsterra ad serving (Placement ID: 6161748) within an isolated 
- * sub-document iframe to protect React's virtual DOM against document.write overrides.
+ * Securely encapsulates Adsterra ad serving (Placement: 6161748 -> Key: 0267c3fa8d2c31053771bd95208e1ce8)
+ * within an isolated sub-document iframe to protect React's virtual DOM against document.write overrides.
  * 
- * Designed in authentic broadsheet newspaper style to seamlessly integrate with
- * Paper Trading's financial aesthetic.
+ * Styled in vintage broadsheet newspaper aesthetic to integrate seamlessly with Paper Trading.
  */
 export default function AdsterraAdBanner({ 
-  placementId = '6161748', 
+  placementId = '6161748',
+  adKey = '0267c3fa8d2c31053771bd95208e1ce8',
   className = '' 
 }) {
   const containerRef = useRef(null);
@@ -23,17 +24,16 @@ export default function AdsterraAdBanner({
     container.innerHTML = '';
 
     const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
-    const width = isMobile ? 320 : 728;
-    const height = isMobile ? 50 : 90;
+    const config = resolveAdsterraPlacement({ placementId, adKey, isMobile });
 
     // Create sandboxed sub-document iframe
     const iframe = document.createElement('iframe');
-    iframe.style.width = `${width}px`;
-    iframe.style.height = `${height}px`;
+    iframe.style.width = `${config.width}px`;
+    iframe.style.height = `${config.height}px`;
     iframe.style.border = 'none';
     iframe.style.overflow = 'hidden';
     iframe.scrolling = 'no';
-    iframe.setAttribute('title', 'Sponsored Financial Dispatch');
+    iframe.setAttribute('title', config.label);
     iframe.setAttribute('loading', 'lazy');
 
     container.appendChild(iframe);
@@ -47,6 +47,7 @@ export default function AdsterraAdBanner({
           <html>
           <head>
             <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1">
             <style>
               body {
                 margin: 0;
@@ -62,14 +63,14 @@ export default function AdsterraAdBanner({
           <body>
             <script type="text/javascript">
               atOptions = {
-                'key' : '${placementId}',
-                'format' : 'iframe',
-                'height' : ${height},
-                'width' : ${width},
+                'key' : '${config.hashKey}',
+                'format' : '${config.format}',
+                'height' : ${config.height},
+                'width' : ${config.width},
                 'params' : {}
               };
             </script>
-            <script type="text/javascript" src="//www.highperformanceformat.com/${placementId}/invoke.js"></script>
+            <script type="text/javascript" src="${config.scriptUrl}"></script>
           </body>
           </html>
         `);
@@ -84,7 +85,7 @@ export default function AdsterraAdBanner({
         container.innerHTML = '';
       }
     };
-  }, [placementId]);
+  }, [placementId, adKey]);
 
   return (
     <aside 

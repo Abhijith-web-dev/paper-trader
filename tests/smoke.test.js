@@ -17,6 +17,7 @@ import {
   sliceRecentIntradayCandles,
   getTimeframeWindowDescription 
 } from '../src/lib/intradayAggregator.js';
+import { ADSTERRA_CONFIG, resolveAdsterraPlacement } from '../src/config/adsterra.js';
 
 console.log('🧪 Starting Automated Smoke Test Suite...');
 
@@ -548,4 +549,32 @@ console.log('  Testing Live Price Batching, Micro-Cache & Circuit Breaker Anti-B
 }
 console.log('  ✅ Live Price Batching, Micro-Cache & Circuit Breaker Anti-Ban Resilience passed.');
 
-console.log('\n🎉 ALL SMOKE TESTS PASSED SUCCESSFULLY! (13/13 test suites)');
+// =========================================================================
+// TEST 14: Adsterra Placement & Cryptographic Hash Key Mapping Invariants
+// =========================================================================
+console.log('  Testing Adsterra Placement & Cryptographic Hash Key Mapping Invariants...');
+{
+  // 14.1 Resolution by placement ID
+  const resolvedByPlacement = resolveAdsterraPlacement({ placementId: '6161748' });
+  assert.equal(resolvedByPlacement.placementId, '6161748');
+  assert.equal(resolvedByPlacement.hashKey, '0267c3fa8d2c31053771bd95208e1ce8');
+  assert.equal(resolvedByPlacement.width, 728);
+  assert.equal(resolvedByPlacement.height, 90);
+  assert.equal(resolvedByPlacement.scriptUrl, '//www.highperformanceformat.com/0267c3fa8d2c31053771bd95208e1ce8/invoke.js');
+
+  // 14.2 Mobile responsive sizing
+  const resolvedMobile = resolveAdsterraPlacement({ placementId: '6161748', isMobile: true });
+  assert.equal(resolvedMobile.width, 320);
+  assert.equal(resolvedMobile.height, 50);
+
+  // 14.3 Cryptographic hash key validity
+  assert.ok(/^[a-f0-9]{32}$/i.test(resolvedByPlacement.hashKey), 'Adsterra key must be a 32-character hexadecimal string');
+
+  // 14.4 Default fallback resilience
+  const fallback = resolveAdsterraPlacement();
+  assert.equal(fallback.hashKey, ADSTERRA_CONFIG.defaultHashKey);
+  assert.equal(fallback.hashKey, '0267c3fa8d2c31053771bd95208e1ce8');
+}
+console.log('  ✅ Adsterra Placement & Cryptographic Hash Key Mapping Invariants passed.');
+
+console.log('\n🎉 ALL SMOKE TESTS PASSED SUCCESSFULLY! (14/14 test suites)');
