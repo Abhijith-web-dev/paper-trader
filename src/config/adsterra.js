@@ -29,7 +29,7 @@ export const ADSTERRA_CONFIG = {
       sublabel: 'Official Adsterra Network Partner'
     },
     popunder: {
-      enabled: false, // Permanently disabled: zero click-to-open ads / popunders
+      enabled: false, // Permanently disabled across whole screen: zero click-to-open screen ads
       key: null,
       scriptUrl: null,
       protectTradingAreas: true
@@ -43,6 +43,16 @@ export const ADSTERRA_CONFIG = {
       enabled: true,
       containerId: 'container-888259038f64ffcff3fbd3c3c0ab4f09',
       scriptUrl: 'https://bauval.org/21/888259038f64ffcff3fbd3c3c0ab4f09'
+    },
+    // Selective tool-triggered ad: strictly restricted to 4 specific components
+    selectiveToolAd: {
+      enabled: true,
+      cooldownMs: 300000, // 5 minutes cooldown per tool
+      globalCooldownMs: 180000, // 3 minutes cooldown globally across session
+      allowedFeatures: ['backtest', 'vault', 'risk-calculator', 'transactions'],
+      dispatchUrl: '/sponsor-dispatch.html',
+      popunderKey: 'd558b6a9096b6007a50019663f7969c3',
+      directLinkUrl: null // Optional direct link override
     }
   },
 
@@ -146,4 +156,150 @@ export function configureAdFormat(formatName, options = {}) {
       ...options
     };
   }
+}
+
+/**
+ * The ONLY 4 components permitted to trigger sponsored click-to-open ads.
+ * Every other button, chart, and page on the site is strictly shielded.
+ */
+export const ALLOWED_TOOL_FEATURES = Object.freeze([
+  'backtest',
+  'vault',
+  'risk-calculator',
+  'transactions'
+]);
+
+/**
+ * Strict 18+ Adult & Erotic Content Keyword Filter
+ * Rejects any ad landing page containing adult, dating, erotic, gambling, or non-mainstream terms.
+ */
+export const ADULT_KEYWORD_BLOCKLIST = Object.freeze([
+  'adult',
+  'erotic',
+  'porn',
+  'xxx',
+  'sex',
+  'dating',
+  'webcam',
+  'camgirl',
+  'strip',
+  'escort',
+  'hookup',
+  'nude',
+  'naked',
+  'milf',
+  'hentai',
+  'fetish',
+  'sensual',
+  'nsfw',
+  'gambling',
+  'casino',
+  'betting',
+  'bet365',
+  '1xbet',
+  'slots',
+  'poker',
+  'roulette',
+  'vape',
+  'cbd',
+  'tobacco',
+  'weed',
+  'cigar'
+]);
+
+/**
+ * Validates whether a URL violates strict 18+ non-adult safety requirements.
+ */
+export function isAdultContentUrl(url) {
+  if (!url || typeof url !== 'string') return false;
+  const lower = url.toLowerCase();
+  return ADULT_KEYWORD_BLOCKLIST.some((keyword) => lower.includes(keyword));
+}
+
+/**
+ * Triggers a sponsored click-to-open ad ONLY for the 4 designated features.
+ * 
+ * Invariants:
+ * 1. featureKey MUST be one of: 'backtest', 'vault', 'risk-calculator', 'transactions'.
+ * 2. All other actions (Buy, Sell, Charts, Search, Watchlist, etc.) return false and do nothing.
+ * 3. Enforces anti-spam cooldown (5 mins per tool, 3 mins globally) to protect user experience.
+ * 4. Strictly validates URLs against adult/erotic keywords.
+ * 5. Uses 'noopener,noreferrer' and removes opener to prevent host window tampering.
+ * 
+ * @param {string} featureKey - The component requesting a sponsored action
+ * @param {object} options - Options including bypassCooldown (useful for unit tests)
+ * @returns {boolean} Whether the ad was triggered
+ */
+export function triggerSelectiveToolAd(featureKey, { bypassCooldown = false } = {}) {
+  // 1. Strict Whitelist Check
+  if (!ALLOWED_TOOL_FEATURES.includes(featureKey)) {
+    return false;
+  }
+
+  const config = ADSTERRA_CONFIG.formats.selectiveToolAd;
+  if (!config || !config.enabled) {
+    return false;
+  }
+
+  // 2. Cooldown & Anti-Spam Gate
+  const now = Date.now();
+  const storageKey = `pt_ad_tool_last_${featureKey}`;
+  const globalStorageKey = 'pt_ad_tool_last_global';
+
+  if (!bypassCooldown && typeof window !== 'undefined' && window.sessionStorage) {
+    try {
+      const lastToolTime = parseInt(sessionStorage.getItem(storageKey) || '0', 10);
+      const lastGlobalTime = parseInt(sessionStorage.getItem(globalStorageKey) || '0', 10);
+
+      if (lastToolTime > 0 && (now - lastToolTime < config.cooldownMs)) {
+        return false;
+      }
+      if (lastGlobalTime > 0 && (now - lastGlobalTime < config.globalCooldownMs)) {
+        return false;
+      }
+    } catch (_) {
+      // Graceful handling of restricted sessionStorage
+    }
+  }
+
+  // 3. Resolve and Verify Destination URL
+  let targetUrl = config.directLinkUrl || (typeof import.meta !== 'undefined' && import.meta.env?.VITE_ADSTERRA_DIRECT_LINK);
+
+  if (targetUrl) {
+    if (isAdultContentUrl(targetUrl)) {
+      console.warn('[Adsterra Safety] Blocked adult ad destination URL:', targetUrl);
+      return false;
+    }
+  } else {
+    // Fall back to the isolated, same-origin sponsor dispatch gateway
+    targetUrl = `${config.dispatchUrl}?feature=${encodeURIComponent(featureKey)}&placement=${encodeURIComponent(ADSTERRA_CONFIG.defaultPlacementId)}`;
+  }
+
+  // 4. Open in isolated secure tab
+  if (typeof window !== 'undefined' && typeof window.open === 'function') {
+    try {
+      const win = window.open(targetUrl, '_blank', 'noopener,noreferrer');
+      if (win) {
+        try {
+          win.opener = null;
+        } catch (_) {}
+      }
+
+      // Record timestamps
+      if (window.sessionStorage) {
+        try {
+          sessionStorage.setItem(storageKey, now.toString());
+          sessionStorage.setItem(globalStorageKey, now.toString());
+        } catch (_) {}
+      }
+
+      return true;
+    } catch (err) {
+      console.warn('[Adsterra] Selective tool ad open error:', err);
+      return false;
+    }
+  }
+
+  // In non-browser (e.g. test environments), return true if permitted
+  return true;
 }

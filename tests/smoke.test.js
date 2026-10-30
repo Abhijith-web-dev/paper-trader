@@ -17,7 +17,14 @@ import {
   sliceRecentIntradayCandles,
   getTimeframeWindowDescription 
 } from '../src/lib/intradayAggregator.js';
-import { ADSTERRA_CONFIG, resolveAdsterraPlacement, configureAdFormat } from '../src/config/adsterra.js';
+import { 
+  ADSTERRA_CONFIG, 
+  resolveAdsterraPlacement, 
+  configureAdFormat,
+  ALLOWED_TOOL_FEATURES,
+  isAdultContentUrl,
+  triggerSelectiveToolAd
+} from '../src/config/adsterra.js';
 
 console.log('🧪 Starting Automated Smoke Test Suite...');
 
@@ -582,4 +589,57 @@ console.log('  Testing Adsterra Placement & Cryptographic Hash Key Mapping Invar
 }
 console.log('  ✅ Adsterra Placement & Cryptographic Hash Key Mapping Invariants passed.');
 
-console.log('\n🎉 ALL SMOKE TESTS PASSED SUCCESSFULLY! (14/14 test suites)');
+// =========================================================================
+// TEST 15: Selective Tool Ad Triggering & Strict 18+ Adult Restriction Safety
+// =========================================================================
+console.log('  Testing Selective Tool Ad Triggering & Strict 18+ Restrictions...');
+{
+  // 15.1 Verify strict feature whitelist
+  assert.deepEqual(
+    [...ALLOWED_TOOL_FEATURES],
+    ['backtest', 'vault', 'risk-calculator', 'transactions'],
+    'Only the 4 specified components can EVER be allowed to trigger ads'
+  );
+
+  // 15.2 Allowed components trigger successfully
+  for (const feature of ALLOWED_TOOL_FEATURES) {
+    const res = triggerSelectiveToolAd(feature, { bypassCooldown: true });
+    assert.equal(res, true, `Feature '${feature}' must be permitted to trigger sponsored ad`);
+  }
+
+  // 15.3 Critical trading controls must NEVER trigger ads (shield validation)
+  const forbiddenActions = ['buy', 'sell', 'order_submit', 'chart_click', 'screener', 'journal', 'search', 'home', 'settings'];
+  for (const action of forbiddenActions) {
+    const res = triggerSelectiveToolAd(action, { bypassCooldown: true });
+    assert.equal(res, false, `Trading action '${action}' MUST be blocked from triggering ads`);
+  }
+
+  // 15.4 Strict 18+ Adult keyword detection
+  const adultUrls = [
+    'https://example.com/dating-hookup',
+    'https://xxx-adult-cam.com',
+    'https://bet365-casino-slots.com',
+    'https://erotic-camgirl.net',
+    'https://porn-hub-tube.com',
+    'https://nude-gallery.org',
+    'https://vape-weed-shop.com'
+  ];
+  for (const url of adultUrls) {
+    assert.equal(isAdultContentUrl(url), true, `URL '${url}' must be flagged as 18+ adult content`);
+  }
+
+  // 15.5 Mainstream / clean financial URLs must pass
+  const cleanUrls = [
+    'https://paper-trader-001.web.app',
+    'https://finance.yahoo.com',
+    'https://tradingview.com',
+    'https://investopedia.com/markets',
+    'https://bauval.org/22/265129238f893cd98f180d1efd562793'
+  ];
+  for (const url of cleanUrls) {
+    assert.equal(isAdultContentUrl(url), false, `Clean financial URL '${url}' must not be flagged`);
+  }
+}
+console.log('  ✅ Selective Tool Ad Triggering & Strict 18+ Restrictions passed.');
+
+console.log('\n🎉 ALL SMOKE TESTS PASSED SUCCESSFULLY! (15/15 test suites)');

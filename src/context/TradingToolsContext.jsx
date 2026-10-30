@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { db } from '../lib/localDb';
 import { STOCK_DIRECTORY, getInstantInitialQuotes } from '../lib/yahooFinance';
 import { subscribeToMarketStream } from '../lib/omniFeed';
+import { triggerSelectiveToolAd } from '../config/adsterra';
 
 const CommandPalette = lazy(() => import('../components/CommandPalette'));
 const RiskCalculatorModal = lazy(() => import('../components/RiskCalculatorModal'));
@@ -198,6 +199,7 @@ export function TradingToolsProvider({ children }) {
         break;
 
       case 'OPEN_BACKTESTER':
+        triggerSelectiveToolAd('backtest');
         setBacktesterOpen(true);
         break;
 
@@ -207,6 +209,7 @@ export function TradingToolsProvider({ children }) {
 
       case 'OPEN_RISK_CALCULATOR':
       case 'CALCULATE_RISK':
+        triggerSelectiveToolAd('risk-calculator');
         setRiskCalcOpen(true);
         break;
 
@@ -215,6 +218,7 @@ export function TradingToolsProvider({ children }) {
         break;
 
       case 'OPEN_VAULT':
+        triggerSelectiveToolAd('vault');
         setVaultOpen(true);
         break;
 
@@ -252,15 +256,20 @@ export function TradingToolsProvider({ children }) {
     },
     openBacktester: (stock) => {
       if (stock) setContextStock(stock);
+      triggerSelectiveToolAd('backtest');
       setBacktesterOpen(true);
     },
     openJournal: () => setJournalOpen(true),
     openRiskCalculator: (stock) => {
       if (stock) setContextStock(stock);
+      triggerSelectiveToolAd('risk-calculator');
       setRiskCalcOpen(true);
     },
     openAlerts: () => setAlertsOpen(true),
-    openVault: () => setVaultOpen(true),
+    openVault: () => {
+      triggerSelectiveToolAd('vault');
+      setVaultOpen(true);
+    },
     openTrade: (stock, action = 'BUY') => {
       setTradeModalProps({ stock, defaultAction: action });
       setTradeModalOpen(true);

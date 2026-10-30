@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTradingTools } from '../context/TradingToolsContext';
+import { triggerSelectiveToolAd } from '../config/adsterra';
 import MarketStatusBadge from './MarketStatusBadge';
 import { 
   Compass, 
@@ -323,6 +324,7 @@ export default function Navbar() {
               </Link>
               <Link
                 to="/transactions"
+                onClick={() => triggerSelectiveToolAd('transactions')}
                 className={`px-3 py-1.5 font-bold transition-all flex items-center gap-1.5 border min-h-[34px] ${
                   location.pathname === '/transactions'
                     ? 'bg-[#111111] text-[#F6F4EE] border-[#111111]'
@@ -450,7 +452,7 @@ export default function Navbar() {
                 </Link>
                 <Link
                   to="/transactions"
-                  onClick={() => setMobileMenuOpen(false)}
+                  onClick={() => { setMobileMenuOpen(false); triggerSelectiveToolAd('transactions'); }}
                   className="p-2 bg-white text-black font-bold flex flex-col items-center justify-center text-[10px] gap-1 border border-black hover:bg-neutral-100"
                 >
                   <History className="w-3.5 h-3.5 text-neutral-700" />

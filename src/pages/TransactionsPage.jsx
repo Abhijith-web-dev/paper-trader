@@ -33,6 +33,7 @@ import {
   RefreshCw
 } from 'lucide-react';
 import { toast } from 'sonner';
+import AdsterraAdBanner from '../components/AdsterraAdBanner';
 
 export default function TransactionsPage() {
   const { userProfile, revertOrder, clearOrderHistory, syncStatus, syncToCloud } = useAuth();
@@ -1329,6 +1330,9 @@ export default function TransactionsPage() {
           </div>
         </div>
       )}
+
+      {/* Sponsored Financial Dispatch Banner */}
+      <AdsterraAdBanner placementId="6161748" adKey="265129238f893cd98f180d1efd562793" className="mt-8 mb-4" />
     </div>
   );
 }
